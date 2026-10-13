@@ -2,12 +2,12 @@
   "appName": "night-inventory",
   "files": {
     "api": {
-      "handler.py": "import json\nfrom typing import Tuple, Dict\n\ndata = []\nnext_id = 1\n\ndef handle(method: str, path: str, body: bytes) -> Tuple[int, Dict]:\n    global data, next_id\n    \n    if method == \"GET\" and path == \"/items\":\n        return (200, data)\n    \n    elif method == \"POST\" and path == \"/items\":\n        try:\n            payload = json.loads(body.decode())\n            new_item = {\n                \"id\": next_id,\n                \"name\": payload[\"name\"],\n                \"quantity\": payload[\"quantity\"]\n            }\n            data.append(new_item)\n            next_id += 1\n            return (201, new_item)\n        except Exception as e:\n            return (400, {\"error\": str(e)})\n    \n    elif method == \"PUT\" and path.startswith(\"/items/\"):\n        try:\n            item_id = int(path.split(\"/\")[3])\n            payload = json.loads(body.decode())\n            delta = payload[\"delta\"]\n            for item in data:\n                if item[\"id\"] == item_id:\n                    item[\"quantity\"] += delta\n                    return (200, item)\n            return (404, {\"error\": \"商品未找到\"})\n        except Exception as e:\n            return (400, {\"error\": str(e)})\n    \n    elif method == \"DELETE\" and path.startswith(\"/items/\"):\n        try:\n            item_id = int(path.split(\"/\")[3])\n            for i, item in enumerate(data):\n                if item[\"id\"] == item_id:\n                    data.pop(i)\n                    return (200, {\"message\": \"商品已刪除\"})\n            return (404, {\"error\": \"商品未找到\"})\n        except Exception as e:\n            return (400, {\"error\": str(e)})\n    \n    else:\n        return (404, {\"error\": \"端點不存在\"})"
+      "handler.py": "import json\nfrom typing import Tuple, Dict\n\ndata = [\n    {\"id\": 1, \"name\": \"雞肉捲\", \"quantity\": 10, \"category\": \"食品\"},\n    {\"id\": 2, \"name\": \"可樂\", \"quantity\": 3, \"category\": \"飲料\"},\n    {\"id\": 3, \"name\": \"玉米熱狗\", \"quantity\": 7, \"category\": \"食品\"},\n    {\"id\": 4, \"name\": \"冰奶茶\", \"quantity\": 2, \"category\": \"飲料\"},\n    {\"id\": 5, \"name\": \"紙杯\", \"quantity\": 15, \"category\": \"其他\"}\n]\nnext_id = 6\n\ndef handle(method: str, path: str, body: bytes) -> Tuple[int, Dict]:\n    global data, next_id\n    \n    if method == \"GET\" and path == \"/items\":\n        return (200, data)\n    \n    elif method == \"POST\" and path == \"/items\":\n        try:\n            payload = json.loads(body.decode())\n            new_item = {\n                \"id\": next_id,\n                \"name\": payload[\"name\"],\n                \"quantity\": payload[\"quantity\"],\n                \"category\": payload.get(\"category\", \"其他\")\n            }\n            data.append(new_item)\n            next_id += 1\n            return (201, new_item)\n        except Exception as e:\n            return (400, {\"error\": str(e)})\n    \n    elif method == \"PUT\" and path.startswith(\"/items/\"):\n        try:\n            item_id = int(path.split(\"/\")[3])\n            payload = json.loads(body.decode())\n            delta = payload[\"delta\"]\n            for item in data:\n                if item[\"id\"] == item_id:\n                    item[\"quantity\"] += delta\n                    return (200, item)\n            return (404, {\"error\": \"商品未找到\"})\n        except Exception as e:\n            return (400, {\"error\": str(e)})\n    \n    elif method == \"DELETE\" and path.startswith(\"/items/\"):\n        try:\n            item_id = int(path.split(\"/\")[3])\n            for i, item in enumerate(data):\n                if item[\"id\"] == item_id:\n                    data.pop(i)\n                    return (200, {\"message\": \"商品已刪除\"})\n            return (404, {\"error\": \"商品未找到\"})\n        except Exception as e:\n            return (400, {\"error\": str(e)})\n    \n    elif method == \"GET\" and path.startswith(\"/items/category/\"):\n        try:\n            category = path.split(\"/\")[4]\n            filtered_items = [item for item in data if item[\"category\"] == category]\n            return (200, filtered_items)\n        except Exception as e:\n            return (400, {\"error\": str(e)})\n    \n    else:\n        return (404, {\"error\": \"端點不存在\"})"
     },
     "web": {
-      "app.js": "document.addEventListener('DOMContentLoaded', () => {\n    const form = document.getElementById('itemForm');\n    const itemsList = document.getElementById('itemsList');\n\n    // 獲取所有商品\n    async function fetchItems() {\n        try {\n            const response = await fetch('api/items');\n            const items = await response.json();\n            displayItems(items);\n        } catch (error) {\n            console.error('獲取商品時出錯:', error);\n        }\n    }\n\n    // 顯示商品列表\n    function displayItems(items) {\n        itemsList.innerHTML = '';\n        if (items.length === 0) {\n            itemsList.innerHTML = '<p>目前沒有商品</p>';\n            return;\n        }\n\n        const table = document.createElement('table');\n        table.innerHTML = `\n            <thead>\n                <tr>\n                    <th>商品名稱</th>\n                    <th>數量</th>\n                    <th>操作</th>\n                </tr>\n            </thead>\n            <tbody>\n                ${items.map(item => `\n                    <tr class=\"${item.quantity < 5 ? 'low-stock' : ''}\">\n                        <td>${item.name}</td>\n                        <td>${item.quantity}</td>\n                        <td>\n                            <button onclick=\"updateQuantity(${item.id}, -1)\">-</button>\n                            <button onclick=\"updateQuantity(${item.id}, 1)\">+</button>\n                            <button onclick=\"deleteItem(${item.id})\">刪除</button>\n                        </td>\n                    </tr>\n                `).join('')}\n            </tbody>\n        `;\n        itemsList.appendChild(table);\n    }\n\n    // 新增商品\n    form.addEventListener('submit', async (e) => {\n        e.preventDefault();\n        const name = document.getElementById('itemName').value;\n        const quantity = parseInt(document.getElementById('itemQuantity').value);\n\n        try {\n            await fetch('api/items', {\n                method: 'POST',\n                headers: { 'Content-Type': 'application/json' },\n                body: JSON.stringify({ name, quantity })\n            });\n            form.reset();\n            fetchItems(); // 重新獲取並顯示商品\n        } catch (error) {\n            console.error('新增商品時出錯:', error);\n        }\n    });\n\n    // 更新數量\n    window.updateQuantity = async (id, delta) => {\n        try {\n            await fetch(`api/items/${id}`, {\n                method: 'PUT',\n                headers: { 'Content-Type': 'application/json' },\n                body: JSON.stringify({ delta })\n            });\n            fetchItems(); // 重新獲取並顯示商品\n        } catch (error) {\n            console.error('更新數量時出錯:', error);\n        }\n    };\n\n    // 刪除商品\n    window.deleteItem = async (id) => {\n        if (!confirm('確定要刪除這個商品嗎？')) return;\n        try {\n            await fetch(`api/items/${id}`, { method: 'DELETE' });\n            fetchItems(); // 重新獲取並顯示商品\n        } catch (error) {\n            console.error('刪除商品時出錯:', error);\n        }\n    };\n\n    // 初始化\n    fetchItems();\n});",
-      "index.html": "<!DOCTYPE html>\n<html lang=\"zh-TW\">\n<head>\n    <meta charset=\"UTF-8\">\n    <title>夜市庫存管理</title>\n    <link rel=\"stylesheet\" href=\"style.css\">\n</head>\n<body>\n    <h1>夜市庫存管理系統</h1>\n\n    <form id=\"itemForm\">\n        <h2>新增商品</h2>\n        <input type=\"text\" id=\"itemName\" placeholder=\"商品名稱\" required>\n        <input type=\"number\" id=\"itemQuantity\" placeholder=\"數量\" min=\"0\" required>\n        <button type=\"submit\">新增商品</button>\n    </form>\n\n    <h2>商品列表</h2>\n    <div id=\"itemsList\"></div>\n\n    <script src=\"app.js\"></script>\n</body>\n</html>",
-      "style.css": "body {\n    font-family: Arial, sans-serif;\n    padding: 20px;\n    background-color: #f5f5f5;\n}\n\nh1, h2 {\n    color: #333;\n}\n\nform {\n    background-color: white;\n    padding: 15px;\n    border-radius: 5px;\n    margin-bottom: 20px;\n}\n\ninput {\n    margin: 5px;\n    padding: 8px;\n    width: 200px;\n}\n\nbutton {\n    padding: 8px 12px;\n    margin: 5px;\n    background-color: #007bff;\n    color: white;\n    border: none;\n    border-radius: 3px;\n    cursor: pointer;\n}\n\nbutton:hover {\n    background-color: #0056b3;\n}\n\n#itemsList table {\n    width: 100%;\n    border-collapse: collapse;\n    background-color: white;\n    margin-top: 20px;\n}\n\n#itemsList th,\n#itemsList td {\n    padding: 10px;\n    text-align: left;\n    border-bottom: 1px solid #ddd;\n}\n\n#itemsList th {\n    background-color: #f8f9fa;\n}\n\n.low-stock {\n    background-color: #fff3cd;\n}\n\n.low-stock td {\n    color: #856404;\n    font-weight: bold;\n}"
+      "app.js": "document.addEventListener('DOMContentLoaded', () => {\n    const form = document.getElementById('itemForm');\n    const itemsList = document.getElementById('itemsList');\n    const categoryFilter = document.getElementById('categoryFilter');\n\n    // 獲取所有商品\n    async function fetchItems(category = 'all') {\n        try {\n            let url = 'api/items';\n            if (category !== 'all') {\n                url += `/category/${category}`;\n            }\n            const response = await fetch(url);\n            const items = await response.json();\n            displayItems(items);\n        } catch (error) {\n            console.error('獲取商品時出錯:', error);\n        }\n    }\n\n    // 顯示商品列表\n    function displayItems(items) {\n        itemsList.innerHTML = '';\n        if (items.length === 0) {\n            itemsList.innerHTML = '<p>目前沒有商品</p>';\n            return;\n        }\n\n        const table = document.createElement('table');\n        table.innerHTML = `\n            <thead>\n                <tr>\n                    <th>商品名稱</th>\n                    <th>數量</th>\n                    <th>操作</th>\n                </tr>\n            </thead>\n            <tbody>\n                ${items.map(item => `\n                    <tr class=\"${item.quantity < 5 ? 'low-stock' : ''}\">\n                        <td>${item.name}</td>\n                        <td>${item.quantity}</td>\n                        <td>\n                            <button onclick=\"updateQuantity(${item.id}, -1)\">-</button>\n                            <button onclick=\"updateQuantity(${item.id}, 1)\">+</button>\n                            <button onclick=\"deleteItem(${item.id})\">刪除</button>\n                        </td>\n                    </tr>\n                `).join('')}\n            </tbody>\n        `;\n        itemsList.appendChild(table);\n    }\n\n    // 新增商品\n    form.addEventListener('submit', async (e) => {\n        e.preventDefault();\n        const name = document.getElementById('itemName').value;\n        const quantity = parseInt(document.getElementById('itemQuantity').value);\n\n        try {\n            await fetch('api/items', {\n                method: 'POST',\n                headers: { 'Content-Type': 'application/json' },\n                body: JSON.stringify({ name, quantity })\n            });\n            form.reset();\n            fetchItems(categoryFilter.value); // 重新獲取並顯示商品\n        } catch (error) {\n            console.error('新增商品時出錯:', error);\n        }\n    });\n\n    // 更新數量\n    window.updateQuantity = async (id, delta) => {\n        try {\n            await fetch(`api/items/${id}`, {\n                method: 'PUT',\n                headers: { 'Content-Type': 'application/json' },\n                body: JSON.stringify({ delta })\n            });\n            fetchItems(categoryFilter.value); // 重新獲取並顯示商品\n        } catch (error) {\n            console.error('更新數量時出錯:', error);\n        }\n    };\n\n    // 刪除商品\n    window.deleteItem = async (id) => {\n        if (!confirm('確定要刪除這個商品嗎？')) return;\n        try {\n            await fetch(`api/items/${id}`, { method: 'DELETE' });\n            fetchItems(categoryFilter.value); // 重新獲取並顯示商品\n        } catch (error) {\n            console.error('刪除商品時出錯:', error);\n        }\n    };\n\n    // 分類篩選\n    categoryFilter.addEventListener('change', () => {\n        fetchItems(categoryFilter.value);\n    });\n\n    // 初始化\n    fetchItems();\n});",
+      "index.html": "<!DOCTYPE html>\n<html lang=\"zh-TW\">\n<head>\n    <meta charset=\"UTF-8\">\n    <title>夜市庫存管理</title>\n    <link rel=\"stylesheet\" href=\"style.css\">\n</head>\n<body>\n    <h1>夜市庫存管理系統</h1>\n\n    <form id=\"itemForm\">\n        <h2>新增商品</h2>\n        <input type=\"text\" id=\"itemName\" placeholder=\"商品名稱\" required>\n        <input type=\"number\" id=\"itemQuantity\" placeholder=\"數量\" min=\"0\" required>\n        <button type=\"submit\">新增商品</button>\n    </form>\n\n    <h2>商品列表</h2>\n    <div>\n        <label for=\"categoryFilter\">分類篩選：</label>\n        <select id=\"categoryFilter\">\n            <option value=\"all\">全部</option>\n            <option value=\"食品\">食品</option>\n            <option value=\"飲料\">飲料</option>\n            <option value=\"其他\">其他</option>\n        </select>\n    </div>\n    <div id=\"itemsList\"></div>\n\n    <script src=\"app.js\"></script>\n</body>\n</html>",
+      "style.css": "body {\n    font-family: Arial, sans-serif;\n    padding: 20px;\n    background-color: #f5f5f5;\n}\n\nh1, h2 {\n    color: #333;\n}\n\nform {\n    background-color: white;\n    padding: 15px;\n    border-radius: 5px;\n    margin-bottom: 20px;\n}\n\ninput {\n    margin: 5px;\n    padding: 8px;\n    width: 200px;\n}\n\nbutton {\n    padding: 8px 12px;\n    margin: 5px;\n    background-color: #007bff;\n    color: white;\n    border: none;\n    border-radius: 3px;\n    cursor: pointer;\n}\n\nbutton:hover {\n    background-color: #0056b3;\n}\n\n#itemsList table {\n    width: 100%;\n    border-collapse: collapse;\n    background-color: white;\n    margin-top: 20px;\n}\n\n#itemsList th,\n#itemsList td {\n    padding: 10px;\n    text-align: left;\n    border-bottom: 1px solid #ddd;\n}\n\n#itemsList th {\n    background-color: #f8f9fa;\n}\n\n.low-stock {\n    background-color: #fff3cd;\n}\n\n.low-stock td {\n    color: #856404;\n    font-weight: bold;\n}\n\n#categoryFilter {\n    padding: 8px;\n    margin: 5px;\n    border-radius: 3px;\n    border: 1px solid #ccc;\n}"
     }
   },
   "history": [
@@ -17,6 +17,13 @@
       "model": "qwen3-coder:30b",
       "request": "小店庫存表，可以新增品項、調整數量、低於 5 個標黃色",
       "summary": "一個小型店鋪庫存管理系統，允許使用者新增商品、調整數量，並在商品數量低於5個時以黃色標示。"
+    },
+    {
+      "at": "2026-10-13T15:53:52Z",
+      "kind": "edit",
+      "model": "qwen3-coder:30b",
+      "request": "加上依分類篩選",
+      "summary": "一個小型店鋪庫存管理系統，允許使用者新增商品、調整數量，並在商品數量低於5個時以黃色標示。現已加入依分類篩選功能。"
     }
   ],
   "plan": {
@@ -43,6 +50,11 @@
             "method": "DELETE",
             "path": "/items/{id}",
             "purpose": "刪除指定ID的商品"
+          },
+          {
+            "method": "GET",
+            "path": "/items/category/{category}",
+            "purpose": "依分類取得商品列表"
           }
         ],
         "modules": [
@@ -60,7 +72,7 @@
           },
           {
             "name": "app.js",
-            "purpose": "處理前端互動邏輯，包括新增、修改商品以及資料顯示"
+            "purpose": "處理前端互動邏輯，包括新增、修改商品以及資料顯示，並支援分類篩選"
           },
           {
             "name": "style.css",
@@ -69,20 +81,19 @@
         ]
       }
     },
-    "notes": "此應用程式使用記憶體儲存商品數據，不包含永續性儲存。所有API端點都使用標準Python庫實現，並支援基本的CRUD操作。前端會自動標示數量低於5的商品為黃色。",
+    "notes": "此應用程式使用記憶體儲存商品數據，不包含永續性儲存。所有API端點都使用標準Python庫實現，並支援基本的CRUD操作與分類篩選功能。前端會自動標示數量低於5的商品為黃色。",
     "steps": [
-      "建立前端網頁結構，包含商品列表和新增商品表單",
-      "設計API端點來處理商品的新增、修改和查詢",
-      "實作前端JavaScript來處理使用者互動與資料顯示",
-      "實作Python API來管理商品數據並提供HTTP接口",
-      "設定前端與API之間的資料傳輸機制",
-      "實現商品數量低於5時的黃色標示功能",
-      "測試所有API端點的功能",
-      "驗證前端互動與後端數據同步",
-      "調整UI樣式使黃色標示更明顯",
-      "部署應用程式到Rancher管理的Kubernetes集群"
+      "更新前端網頁結構，加入分類篩選介面",
+      "設計API端點來處理依分類查詢商品的功能",
+      "實作前端JavaScript來處理篩選邏輯與資料顯示",
+      "更新Python API以支援按分類篩選商品的查詢功能",
+      "設定前端與API之間的篩選資料傳輸機制",
+      "測試新增的分類篩選API端點",
+      "驗證前端篩選功能與後端數據同步",
+      "調整UI樣式使篩選介面更直觀",
+      "部署更新後的應用程式到Rancher管理的Kubernetes集群"
     ],
-    "summary": "一個小型店鋪庫存管理系統，允許使用者新增商品、調整數量，並在商品數量低於5個時以黃色標示。"
+    "summary": "一個小型店鋪庫存管理系統，允許使用者新增商品、調整數量，並在商品數量低於5個時以黃色標示。現已加入依分類篩選功能。"
   },
   "schema": 1
 }

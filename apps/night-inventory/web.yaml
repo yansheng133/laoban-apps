@@ -21,7 +21,7 @@ spec:
         app.kubernetes.io/name: "night-inventory-web"
         app.kubernetes.io/component: "web"
       annotations:
-        laoban.io/content-hash: "19be3d99e9b9145ab5e98f749133c6621e8df8a95aa8d8dfea21fe74168cc1d7"
+        laoban.io/content-hash: "9ba858341c755c3283fb59a9fa61d556fb5322908fc49bc0c9567650f586d617"
     spec:
       automountServiceAccountToken: false
       securityContext:
