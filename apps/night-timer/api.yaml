@@ -21,7 +21,7 @@ spec:
         app.kubernetes.io/name: "night-timer-api"
         app.kubernetes.io/component: "api"
       annotations:
-        laoban.io/content-hash: "a678633defb552f360aa3840df4f645995f0e00aec692202d1362c18c47c9112"
+        laoban.io/content-hash: "465c60f2cc955c794f23da684bb97c805949ad9ff29a540f9776c7fe60ba88f3"
     spec:
       automountServiceAccountToken: false
       securityContext:

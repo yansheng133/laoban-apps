@@ -2,12 +2,12 @@
   "appName": "night-timer",
   "files": {
     "api": {
-      "handler.py": "import json\n\ncount = 0\n\ndef handle(method, path, body):\n    global count\n    \n    if method == \"GET\" and path == \"/count\":\n        return (200, {\"count\": count})\n    \n    elif method == \"POST\" and path == \"/count/increment\":\n        count += 1\n        return (200, {\"count\": count})\n    \n    elif method == \"GET\" and path == \"/timer\":\n        # For this simple implementation, we don't track timer state in API\n        # Just return a default response indicating timer is not running\n        return (200, {\"status\": \"idle\", \"time_left\": 25 * 60})\n    \n    elif method == \"POST\" and path == \"/timer/start\":\n        # In a real implementation, we would start the timer here\n        # For now, we just return success\n        return (200, {\"status\": \"started\"})\n    \n    elif method == \"POST\" and path == \"/timer/stop\":\n        # In a real implementation, we would stop the timer here\n        # For now, we just return success\n        return (200, {\"status\": \"stopped\"})\n    \n    elif method == \"POST\" and path == \"/timer/reset\":\n        # In a real implementation, we would reset the timer here\n        # For now, we just return success\n        return (200, {\"status\": \"reset\"})\n    \n    else:\n        return (404, {\"error\": \"Not Found\"})"
+      "handler.py": "import json\n\ncount = 0\nwork_minutes = 25\nbreak_minutes = 5\n\ndef handle(method, path, body):\n    global count, work_minutes, break_minutes\n    \n    if method == \"GET\" and path == \"/count\":\n        return (200, {\"count\": count})\n    \n    elif method == \"POST\" and path == \"/count/increment\":\n        count += 1\n        return (200, {\"count\": count})\n    \n    elif method == \"GET\" and path == \"/timer\":\n        # For this simple implementation, we don't track timer state in API\n        # Just return a default response indicating timer is not running\n        return (200, {\"status\": \"idle\", \"time_left\": work_minutes * 60})\n    \n    elif method == \"POST\" and path == \"/timer/start\":\n        # In a real implementation, we would start the timer here\n        # For now, we just return success\n        return (200, {\"status\": \"started\"})\n    \n    elif method == \"POST\" and path == \"/timer/stop\":\n        # In a real implementation, we would stop the timer here\n        # For now, we just return success\n        return (200, {\"status\": \"stopped\"})\n    \n    elif method == \"POST\" and path == \"/timer/reset\":\n        # In a real implementation, we would reset the timer here\n        # For now, we just return success\n        return (200, {\"status\": \"reset\"})\n    \n    elif method == \"GET\" and path == \"/settings\":\n        return (200, {\n            \"work_minutes\": work_minutes,\n            \"break_minutes\": break_minutes\n        })\n    \n    elif method == \"POST\" and path == \"/settings\":\n        try:\n            data = json.loads(body.decode())\n            work_minutes = data.get(\"work_minutes\", work_minutes)\n            break_minutes = data.get(\"break_minutes\", break_minutes)\n            return (200, {\"status\": \"success\"})\n        except Exception:\n            return (400, {\"error\": \"Invalid JSON\"})\n    \n    else:\n        return (404, {\"error\": \"Not Found\"})"
     },
     "web": {
-      "app.js": "let timer = null;\nlet isRunning = false;\nlet secondsLeft = 25 * 60; // 25 minutes in seconds\nlet isBreakTime = false;\n\nconst timerDisplay = document.getElementById('timer');\nconst startBtn = document.getElementById('startBtn');\nconst stopBtn = document.getElementById('stopBtn');\nconst resetBtn = document.getElementById('resetBtn');\nconst countDisplay = document.getElementById('count');\nconst notification = document.getElementById('notification');\n\nfunction updateTimerDisplay() {\n    const minutes = Math.floor(secondsLeft / 60);\n    const seconds = secondsLeft % 60;\n    timerDisplay.textContent = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;\n}\n\nfunction startTimer() {\n    if (isRunning) return;\n    \n    isRunning = true;\n    timer = setInterval(() => {\n        secondsLeft--;\n        updateTimerDisplay();\n        \n        if (secondsLeft <= 0) {\n            clearInterval(timer);\n            isRunning = false;\n            \n            if (!isBreakTime) {\n                // Pomodoro time finished, start break\n                isBreakTime = true;\n                secondsLeft = 5 * 60; // 5 minutes break\n                showNotification('休息時間到！');\n                updateTimerDisplay();\n                startTimer(); // Auto-start break timer\n            } else {\n                // Break time finished, increment count and start new pomodoro\n                isBreakTime = false;\n                secondsLeft = 25 * 60; // 25 minutes\n                incrementCount();\n                showNotification('新的番茄鐘開始！');\n                updateTimerDisplay();\n            }\n        }\n    }, 1000);\n}\n\nfunction stopTimer() {\n    if (!isRunning) return;\n    \n    clearInterval(timer);\n    isRunning = false;\n}\n\nfunction resetTimer() {\n    stopTimer();\n    secondsLeft = isBreakTime ? 5 * 60 : 25 * 60; // Reset to current mode\n    updateTimerDisplay();\n}\n\nfunction incrementCount() {\n    fetch('api/count/increment', { method: 'POST' })\n        .then(response => response.json())\n        .then(data => {\n            countDisplay.textContent = data.count;\n        });\n}\n\nfunction getCount() {\n    fetch('api/count')\n        .then(response => response.json())\n        .then(data => {\n            countDisplay.textContent = data.count;\n        });\n}\n\nfunction showNotification(message) {\n    notification.textContent = message;\n    notification.style.display = 'block';\n    \n    setTimeout(() => {\n        notification.style.display = 'none';\n    }, 3000);\n}\n\n// Initialize the display\ngetCount();\nupdateTimerDisplay();\n\nstartBtn.addEventListener('click', startTimer);\nstopBtn.addEventListener('click', stopTimer);\nresetBtn.addEventListener('click', resetTimer);",
-      "index.html": "<!DOCTYPE html>\n<html lang=\"zh-TW\">\n<head>\n    <meta charset=\"UTF-8\">\n    <title>番茄鐘</title>\n    <link rel=\"stylesheet\" href=\"style.css\">\n</head>\n<body>\n    <div class=\"container\">\n        <h1>番茄鐘</h1>\n        \n        <div class=\"timer-display\" id=\"timer\">25:00</div>\n        \n        <div class=\"controls\">\n            <button id=\"startBtn\">開始</button>\n            <button id=\"stopBtn\">停止</button>\n            <button id=\"resetBtn\">重置</button>\n        </div>\n        \n        <div class=\"stats\">\n            <p>完成次數: <span id=\"count\">0</span></p>\n        </div>\n        \n        <div class=\"notification\" id=\"notification\"></div>\n    </div>\n    \n    <script src=\"app.js\"></script>\n</body>\n</html>",
-      "style.css": "body {\n    font-family: 'Arial', sans-serif;\n    background-color: #f0f8ff;\n    display: flex;\n    justify-content: center;\n    align-items: center;\n    height: 100vh;\n    margin: 0;\n}\n\n.container {\n    text-align: center;\n    background-color: white;\n    padding: 2rem;\n    border-radius: 10px;\n    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);\n}\n\nh1 {\n    color: #333;\n    margin-bottom: 1rem;\n}\n\ntimer-display {\n    font-size: 3rem;\n    font-weight: bold;\n    margin: 1rem 0;\n    color: #2c5e9e;\n}\n\n.controls button {\n    background-color: #4CAF50;\n    border: none;\n    color: white;\n    padding: 10px 20px;\n    margin: 0.5rem;\n    cursor: pointer;\n    border-radius: 5px;\n    font-size: 1rem;\n}\n\n.controls button:hover {\n    background-color: #45a049;\n}\n\n.stats p {\n    font-size: 1.2rem;\n    color: #333;\n}\n\n.notification {\n    position: fixed;\n    top: 20px;\n    right: 20px;\n    background-color: #ffeb3b;\n    padding: 15px;\n    border-radius: 5px;\n    display: none;\n    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);\n}"
+      "app.js": "let timer = null;\nlet isRunning = false;\nlet secondsLeft = 25 * 60; // 25 minutes in seconds\nlet isBreakTime = false;\nlet workMinutes = 25;\nlet breakMinutes = 5;\n\nconst timerDisplay = document.getElementById('timer');\nconst startBtn = document.getElementById('startBtn');\nconst stopBtn = document.getElementById('stopBtn');\nconst resetBtn = document.getElementById('resetBtn');\nconst countDisplay = document.getElementById('count');\nconst notification = document.getElementById('notification');\nconst workMinutesInput = document.getElementById('workMinutes');\nconst breakMinutesInput = document.getElementById('breakMinutes');\nconst saveSettingsBtn = document.getElementById('saveSettingsBtn');\n\nfunction updateTimerDisplay() {\n    const minutes = Math.floor(secondsLeft / 60);\n    const seconds = secondsLeft % 60;\n    timerDisplay.textContent = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;\n}\n\nfunction startTimer() {\n    if (isRunning) return;\n    \n    isRunning = true;\n    timer = setInterval(() => {\n        secondsLeft--;\n        updateTimerDisplay();\n        \n        if (secondsLeft <= 0) {\n            clearInterval(timer);\n            isRunning = false;\n            \n            if (!isBreakTime) {\n                // Pomodoro time finished, start break\n                isBreakTime = true;\n                secondsLeft = breakMinutes * 60; // Use custom break time\n                showNotification('休息時間到！');\n                updateTimerDisplay();\n                startTimer(); // Auto-start break timer\n            } else {\n                // Break time finished, increment count and start new pomodoro\n                isBreakTime = false;\n                secondsLeft = workMinutes * 60; // Use custom work time\n                incrementCount();\n                showNotification('新的番茄鐘開始！');\n                updateTimerDisplay();\n            }\n        }\n    }, 1000);\n}\n\nfunction stopTimer() {\n    if (!isRunning) return;\n    \n    clearInterval(timer);\n    isRunning = false;\n}\n\nfunction resetTimer() {\n    stopTimer();\n    secondsLeft = isBreakTime ? breakMinutes * 60 : workMinutes * 60; // Reset to current mode\n    updateTimerDisplay();\n}\n\nfunction incrementCount() {\n    fetch('api/count/increment', { method: 'POST' })\n        .then(response => response.json())\n        .then(data => {\n            countDisplay.textContent = data.count;\n        });\n}\n\nfunction getCount() {\n    fetch('api/count')\n        .then(response => response.json())\n        .then(data => {\n            countDisplay.textContent = data.count;\n        });\n}\n\nfunction saveSettings() {\n    const newWorkMinutes = parseInt(workMinutesInput.value);\n    const newBreakMinutes = parseInt(breakMinutesInput.value);\n    \n    if (isNaN(newWorkMinutes) || isNaN(newBreakMinutes) || newWorkMinutes < 1 || newBreakMinutes < 1) {\n        showNotification('請輸入有效的分鐘數');\n        return;\n    }\n    \n    workMinutes = newWorkMinutes;\n    breakMinutes = newBreakMinutes;\n    \n    // Update the timer display to reflect new settings\n    if (!isRunning) {\n        secondsLeft = isBreakTime ? breakMinutes * 60 : workMinutes * 60;\n        updateTimerDisplay();\n    }\n    \n    // Send settings to backend\n    fetch('api/settings', {\n        method: 'POST',\n        headers: {\n            'Content-Type': 'application/json'\n        },\n        body: JSON.stringify({\n            work_minutes: newWorkMinutes,\n            break_minutes: newBreakMinutes\n        })\n    })\n    .then(response => response.json())\n    .then(data => {\n        showNotification('設定已儲存');\n    })\n    .catch(error => {\n        showNotification('儲存設定時發生錯誤');\n    });\n}\n\nfunction getSettings() {\n    fetch('api/settings')\n        .then(response => response.json())\n        .then(data => {\n            workMinutes = data.work_minutes;\n            breakMinutes = data.break_minutes;\n            workMinutesInput.value = workMinutes;\n            breakMinutesInput.value = breakMinutes;\n        });\n}\n\nfunction showNotification(message) {\n    notification.textContent = message;\n    notification.style.display = 'block';\n    \n    setTimeout(() => {\n        notification.style.display = 'none';\n    }, 3000);\n}\n\n// Initialize the display\ngetCount();\ngetSettings();\nupdateTimerDisplay();\n\nstartBtn.addEventListener('click', startTimer);\nstopBtn.addEventListener('click', stopTimer);\nresetBtn.addEventListener('click', resetTimer);\nsaveSettingsBtn.addEventListener('click', saveSettings);",
+      "index.html": "<!DOCTYPE html>\n<html lang=\"zh-TW\">\n<head>\n    <meta charset=\"UTF-8\">\n    <title>番茄鐘</title>\n    <link rel=\"stylesheet\" href=\"style.css\">\n</head>\n<body>\n    <div class=\"container\">\n        <h1>番茄鐘</h1>\n        \n        <div class=\"timer-display\" id=\"timer\">25:00</div>\n        \n        <div class=\"controls\">\n            <button id=\"startBtn\">開始</button>\n            <button id=\"stopBtn\">停止</button>\n            <button id=\"resetBtn\">重置</button>\n        </div>\n        \n        <div class=\"settings\">\n            <label for=\"workMinutes\">工作時間 (分鐘): </label>\n            <input type=\"number\" id=\"workMinutes\" min=\"1\" value=\"25\">\n            <label for=\"breakMinutes\">休息時間 (分鐘): </label>\n            <input type=\"number\" id=\"breakMinutes\" min=\"1\" value=\"5\">\n            <button id=\"saveSettingsBtn\">儲存設定</button>\n        </div>\n        \n        <div class=\"stats\">\n            <p>完成次數: <span id=\"count\">0</span></p>\n        </div>\n        \n        <div class=\"notification\" id=\"notification\"></div>\n    </div>\n    \n    <script src=\"app.js\"></script>\n</body>\n</html>",
+      "style.css": "body {\n    font-family: 'Arial', sans-serif;\n    background-color: #f0f8ff;\n    display: flex;\n    justify-content: center;\n    align-items: center;\n    height: 100vh;\n    margin: 0;\n}\n\n.container {\n    text-align: center;\n    background-color: white;\n    padding: 2rem;\n    border-radius: 10px;\n    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);\n}\n\nh1 {\n    color: #333;\n    margin-bottom: 1rem;\n}\n\ntimer-display {\n    font-size: 3rem;\n    font-weight: bold;\n    margin: 1rem 0;\n    color: #2c5e9e;\n}\n\n.controls button, .settings button {\n    background-color: #4CAF50;\n    border: none;\n    color: white;\n    padding: 10px 20px;\n    margin: 0.5rem;\n    cursor: pointer;\n    border-radius: 5px;\n    font-size: 1rem;\n}\n\n.controls button:hover, .settings button:hover {\n    background-color: #45a049;\n}\n\n.stats p {\n    font-size: 1.2rem;\n    color: #333;\n}\n\n.notification {\n    position: fixed;\n    top: 20px;\n    right: 20px;\n    background-color: #ffeb3b;\n    padding: 15px;\n    border-radius: 5px;\n    display: none;\n    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);\n}\n\n.settings {\n    margin-top: 1rem;\n}\n\n.settings input {\n    width: 60px;\n    padding: 5px;\n    margin: 0 5px;\n    text-align: center;\n}"
     }
   },
   "history": [
@@ -17,6 +17,13 @@
       "model": "qwen3-coder:30b",
       "request": "番茄鐘，25 分鐘倒數、休息 5 分鐘、記錄完成次數",
       "summary": "建立一個番茄鐘應用程式，具有 25 分鐘計時、5 分鐘休息時間和完成次數記錄功能。"
+    },
+    {
+      "at": "2026-10-13T16:08:46Z",
+      "kind": "edit",
+      "model": "qwen3-coder:30b",
+      "request": "可以自訂工作和休息分鐘數",
+      "summary": "建立一個可自訂工作和休息時間的番茄鐘應用程式，具有 25 分鐘計時、5 分鐘休息時間和完成次數記錄功能。"
     }
   ],
   "plan": {
@@ -53,12 +60,22 @@
             "method": "POST",
             "path": "/api/timer/reset",
             "purpose": "重置倒數計時器"
+          },
+          {
+            "method": "GET",
+            "path": "/api/settings",
+            "purpose": "取得目前的工作與休息時間設定"
+          },
+          {
+            "method": "POST",
+            "path": "/api/settings",
+            "purpose": "更新工作與休息時間設定"
           }
         ],
         "modules": [
           {
             "name": "pomodoro_api.py",
-            "purpose": "實作番茄鐘的後端 API 服務，管理計數狀態"
+            "purpose": "實作番茄鐘的後端 API 服務，管理計數狀態與時間設定"
           }
         ]
       },
@@ -70,7 +87,7 @@
           },
           {
             "name": "app.js",
-            "purpose": "處理前端互動邏輯、倒數計時和與 API 的通訊"
+            "purpose": "處理前端互動邏輯、倒數計時和與 API 的通訊，包含自訂時間設定功能"
           },
           {
             "name": "style.css",
@@ -79,18 +96,18 @@
         ]
       }
     },
-    "notes": "此應用程式使用標準函式庫實現，資料儲存在記憶體中。部署時需確保 Kubernetes 集群可正確處理靜態檔案與 API 端點路由。",
+    "notes": "此應用程式使用標準函式庫實現，資料儲存在記憶體中。部署時需確保 Kubernetes 集群可正確處理靜態檔案與 API 端點路由。新增的設定功能允許使用者自訂工作和休息時間。",
     "steps": [
-      "設計前端使用者介面，包含倒數計時器、開始/停止按鈕和休息提醒",
-      "實作前端 JavaScript 程式碼處理倒數計時和狀態切換",
-      "建立後端 API 服務，用於儲存和管理番茄鐘的完成次數",
-      "撰寫後端 Python 模組，實現基本的 HTTP 請求處理功能",
-      "設定 API 端點以獲取和更新番茄鐘計數",
-      "整合前端與後端 API，使計數能即時同步",
-      "測試倒數計時器是否準確運作 25 分鐘和 5 分鐘",
-      "驗證休息時間提醒功能是否正常顯示",
-      "確認完成次數記錄功能是否正確累加",
-      "檢查應用程式在瀏覽器中的整體使用者體驗",
+      "更新前端使用者介面，加入可設定工作和休息分鐘數的輸入欄位",
+      "修改前端 JavaScript 程式碼以支援自訂時間設定並傳遞至後端 API",
+      "更新後端 API 模組，新增設定工作與休息時間的端點",
+      "調整後端 Python 模組以處理自訂時間設定的儲存與讀取",
+      "設定新的 API 端點來取得和更新工作與休息時間設定",
+      "整合前端與後端自訂時間功能，使設定能即時生效",
+      "測試自訂時間功能是否正確套用至倒數計時器",
+      "驗證自訂時間在不同數值下是否正常運作",
+      "確認完成次數記錄功能不受時間設定變更影響",
+      "檢查應用程式整體使用者體驗與介面互動反應",
       "優化前端 UI 美觀與互動反應速度",
       "進行整合測試確保所有功能協同運作",
       "部署應用程式至 Rancher 管理的 Kubernetes 集群",
@@ -98,7 +115,7 @@
       "撰寫使用說明文件",
       "準備上線前的最終檢查清單"
     ],
-    "summary": "建立一個番茄鐘應用程式，具有 25 分鐘計時、5 分鐘休息時間和完成次數記錄功能。"
+    "summary": "建立一個可自訂工作和休息時間的番茄鐘應用程式，具有 25 分鐘計時、5 分鐘休息時間和完成次數記錄功能。"
   },
   "schema": 1
 }
