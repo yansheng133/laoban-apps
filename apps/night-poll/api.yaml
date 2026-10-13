@@ -21,7 +21,7 @@ spec:
         app.kubernetes.io/name: "night-poll-api"
         app.kubernetes.io/component: "api"
       annotations:
-        laoban.io/content-hash: "f13d34e7d058832f60777b92afd48eb96500ca4817bdbc0c05479d1f271685e1"
+        laoban.io/content-hash: "78b61f12cca28cbc3a10e833dcc28292a2aa4c620f5b8ac1e07fa7c0adcbef9c"
     spec:
       automountServiceAccountToken: false
       securityContext:
