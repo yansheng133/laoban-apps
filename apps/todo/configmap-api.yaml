@@ -8,7 +8,75 @@ metadata:
     app.kubernetes.io/name: "todo-api"
     app.kubernetes.io/component: "api"
 data:
-  handler.py: "import json\nfrom typing import Tuple, Dict\n\ntodos = []\nnext_id = 1\n\ndef handle(method: str, path: str, body: bytes) -> Tuple[int, Dict]:\n    global todos, next_id\n    \n    if method == 'GET' and path == '/todos':\n        return (200, {'todos': todos, 'count': len(todos)})\n    \n    elif method == 'GET' and path == '/todos/priority':\n        try:\n            # Sort todos by priority\n            priority_order = {'high': 0, 'medium': 1, 'low': 2}\n            sorted_todos = sorted(todos, key=lambda t: priority_order.get(t.get('priority'), 2))\n            return (200, {'todos': sorted_todos, 'count': len(sorted_todos)})\n        except Exception as e:\n            return (500, {'error': 'internal server error'})\n    \n    elif method == 'POST' and path == '/todos':\n        try:\n            data = json.loads(body.decode())\n            text = data.get('text')\n            priority = data.get('priority', 'high')  # Default to high priority\n            \n            if not text:\n                return (400, {'error': 'text is required'})\n            \n            todo = {\n                'id': next_id,\n                'text': text,\n                'completed': False,\n                'priority': priority\n            }\n            todos.append(todo)\n            next_id += 1\n            return (201, {'todo': todo, 'count': len(todos)})\n        except json.JSONDecodeError:\n            return (400, {'error': 'invalid JSON'})\n    \n    elif method == 'PUT' and path.startswith('/todos/'):\n        try:\n            id = int(path.split('/')[-1])\n            todo = next((t for t in todos if t['id'] == id), None)\n            if not todo:\n                return (404, {'error': 'todo not found'})\n            \n            todo['completed'] = not todo['completed']\n            return (200, {'todo': todo, 'count': len(todos)})\n        except ValueError:\n            return (400, {'error': 'invalid id'})\n    \n    elif method == 'DELETE' and path.startswith('/todos/'):\n        try:\n            id = int(path.split('/')[-1])\n            todo = next((t for t in todos if t['id'] == id), None)\n            if not todo:\n                return (404, {'error': 'todo not found'})\n            \n            todos = [t for t in todos if t['id'] != id]\n            return (200, {'message': 'todo deleted', 'count': len(todos)})\n        except ValueError:\n            return (400, {'error': 'invalid id'})\n    \n    return (404, {'error': 'not found'})"
+  handler.py: |
+    import json
+    from typing import Tuple, Dict
+
+    todos = []
+    next_id = 1
+
+    def handle(method: str, path: str, body: bytes) -> Tuple[int, Dict]:
+        global todos, next_id
+        
+        if method == 'GET' and path == '/todos':
+            return (200, {'todos': todos, 'count': len(todos)})
+        
+        elif method == 'GET' and path == '/todos/priority':
+            try:
+                # Sort todos by priority
+                priority_order = {'high': 0, 'medium': 1, 'low': 2}
+                sorted_todos = sorted(todos, key=lambda t: priority_order.get(t.get('priority'), 2))
+                return (200, {'todos': sorted_todos, 'count': len(sorted_todos)})
+            except Exception as e:
+                return (500, {'error': 'internal server error'})
+        
+        elif method == 'POST' and path == '/todos':
+            try:
+                data = json.loads(body.decode())
+                text = data.get('text')
+                priority = data.get('priority', 'high')  # Default to high priority
+                
+                if not text:
+                    return (400, {'error': 'text is required'})
+                
+                todo = {
+                    'id': next_id,
+                    'text': text,
+                    'completed': False,
+                    'priority': priority
+                }
+                todos.append(todo)
+                next_id += 1
+                return (201, {'todo': todo, 'count': len(todos)})
+            except json.JSONDecodeError:
+                return (400, {'error': 'invalid JSON'})
+        
+        elif method == 'PUT' and path.startswith('/todos/'):
+            try:
+                id = int(path.split('/')[-1])
+                todo = next((t for t in todos if t['id'] == id), None)
+                if not todo:
+                    return (404, {'error': 'todo not found'})
+                
+                todo['completed'] = not todo['completed']
+                return (200, {'todo': todo, 'count': len(todos)})
+            except ValueError:
+                return (400, {'error': 'invalid id'})
+        
+        elif method == 'DELETE' and path.startswith('/todos/'):
+            try:
+                id = int(path.split('/')[-1])
+                todo = next((t for t in todos if t['id'] == id), None)
+                if not todo:
+                    return (404, {'error': 'todo not found'})
+                
+                todos = [t for t in todos if t['id'] != id]
+                return (200, {'message': 'todo deleted', 'count': len(todos)})
+            except ValueError:
+                return (400, {'error': 'invalid id'})
+        
+        return (404, {'error': 'not found'})
+    # t14-reload
   main.py: |
     """laoban API server (fixed template, not generated by AI).
 

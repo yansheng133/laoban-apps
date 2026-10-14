@@ -21,7 +21,7 @@ spec:
         app.kubernetes.io/name: "todo-api"
         app.kubernetes.io/component: "api"
       annotations:
-        laoban.io/content-hash: "a49bbbea70df24f3c251dc1cfba98b3fb75654b9914207e4d5d11be4371db3dc"
+        laoban.io/content-hash: "dd0cc188df1eb8fbb9804ddebcb7d11d2f12610ef8ea6a0943500869c8570c95"
     spec:
       automountServiceAccountToken: false
       securityContext:
