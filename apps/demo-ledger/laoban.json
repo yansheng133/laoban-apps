@@ -1,0 +1,84 @@
+{
+  "appName": "demo-ledger",
+  "files": {
+    "api": {
+      "handler.py": "import json\n\n# 記帳本資料儲存於記憶體中\ntransactions = []\n\n\ndef handle(method, path, body):\n    if method == \"GET\" and path == \"/transactions\":\n        return (200, transactions)\n    \n    elif method == \"POST\" and path == \"/transactions\":\n        data = json.loads(body.decode())\n        transaction = {\n            \"description\": data[\"description\"],\n            \"amount\": data[\"amount\"],\n            \"type\": data[\"type\"]\n        }\n        transactions.append(transaction)\n        return (201, transaction)\n    \n    elif method == \"GET\" and path == \"/balance\":\n        balance = 0\n        for t in transactions:\n            if t[\"type\"] == \"income\":\n                balance += t[\"amount\"]\n            else:\n                balance -= t[\"amount\"]\n        return (200, {\"balance\": balance})\n    \n    return (404, {\"error\": \"Not Found\"})"
+    },
+    "web": {
+      "app.js": "document.addEventListener('DOMContentLoaded', () => {\n    const form = document.getElementById('transactionForm');\n    const transactionList = document.getElementById('transactionList');\n    const currentBalance = document.getElementById('currentBalance');\n\n    // 重新整理畫面\n    function refresh() {\n        fetch('api/transactions')\n            .then(response => response.json())\n            .then(data => {\n                renderTransactions(data);\n            });\n        \n        fetch('api/balance')\n            .then(response => response.json())\n            .then(data => {\n                currentBalance.textContent = data.balance.toFixed(2);\n            });\n    }\n\n    // 渲染交易紀錄\n    function renderTransactions(transactions) {\n        transactionList.innerHTML = '';\n        transactions.forEach(transaction => {\n            const li = document.createElement('li');\n            li.className = transaction.type === 'income' ? 'income' : 'expense';\n            li.textContent = `${transaction.description}: ${transaction.type === 'income' ? '+' : '-'}$${transaction.amount.toFixed(2)}`;\n            transactionList.appendChild(li);\n        });\n    }\n\n    // 處理表單提交\n    form.addEventListener('submit', (e) => {\n        e.preventDefault();\n        \n        const description = document.getElementById('description').value;\n        const amount = parseFloat(document.getElementById('amount').value);\n        const type = document.getElementById('type').value;\n        \n        fetch('api/transactions', {\n            method: 'POST',\n            headers: {\n                'Content-Type': 'application/json'\n            },\n            body: JSON.stringify({\n                description: description,\n                amount: amount,\n                type: type\n            })\n        })\n        .then(() => {\n            form.reset();\n            refresh();\n        });\n    });\n\n    // 初始載入\n    refresh();\n});",
+      "index.html": "<!DOCTYPE html>\n<html lang=\"zh-TW\">\n<head>\n    <meta charset=\"UTF-8\">\n    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n    <title>記帳本</title>\n    <link rel=\"stylesheet\" href=\"style.css\">\n</head>\n<body>\n    <div class=\"container\">\n        <h1>記帳本</h1>\n        \n        <form id=\"transactionForm\">\n            <div>\n                <label for=\"description\">描述:</label>\n                <input type=\"text\" id=\"description\" required>\n            </div>\n            <div>\n                <label for=\"amount\">金額:</label>\n                <input type=\"number\" id=\"amount\" step=\"0.01\" required>\n            </div>\n            <div>\n                <label for=\"type\">類型:</label>\n                <select id=\"type\" required>\n                    <option value=\"income\">收入</option>\n                    <option value=\"expense\">支出</option>\n                </select>\n            </div>\n            <button type=\"submit\">新增交易</button>\n        </form>\n\n        <div class=\"balance\">\n            <h2>目前餘額: <span id=\"currentBalance\">0.00</span></h2>\n        </div>\n\n        <div class=\"transactions\">\n            <h2>交易紀錄</h2>\n            <ul id=\"transactionList\"></ul>\n        </div>\n    </div>\n\n    <script src=\"app.js\"></script>\n</body>\n</html>",
+      "style.css": "* {\n    box-sizing: border-box;\n    margin: 0;\n    padding: 0;\n}\n\nbody {\n    font-family: Arial, sans-serif;\n    background-color: #f5f5f5;\n    padding: 20px;\n}\n\n.container {\n    max-width: 600px;\n    margin: 0 auto;\n    background-color: white;\n    padding: 20px;\n    border-radius: 8px;\n    box-shadow: 0 2px 10px rgba(0,0,0,0.1);\n}\n\nh1 {\n    text-align: center;\n    color: #333;\n    margin-bottom: 20px;\n}\n\nform {\n    display: flex;\n    flex-direction: column;\n    gap: 15px;\n    margin-bottom: 30px;\n}\n\nform div {\n    display: flex;\n    flex-direction: column;\n}\n\nlabel {\n    font-weight: bold;\n    margin-bottom: 5px;\n    color: #555;\n}\n\ninput, select {\n    padding: 10px;\n    border: 1px solid #ddd;\n    border-radius: 4px;\n    font-size: 16px;\n}\n\nbutton {\n    padding: 12px;\n    background-color: #007bff;\n    color: white;\n    border: none;\n    border-radius: 4px;\n    cursor: pointer;\n    font-size: 16px;\n}\n\nbutton:hover {\n    background-color: #0056b3;\n}\n\n.balance {\n    text-align: center;\n    margin-bottom: 20px;\n    padding: 15px;\n    background-color: #e9ecef;\n    border-radius: 4px;\n}\n\n.balance h2 {\n    color: #333;\n}\n\n.transactions h2 {\n    margin-bottom: 15px;\n    color: #333;\n}\n\n#transactionList {\n    list-style-type: none;\n}\n\n#transactionList li {\n    padding: 10px;\n    margin-bottom: 8px;\n    border-radius: 4px;\n    background-color: #f8f9fa;\n    border-left: 4px solid #007bff;\n}\n\nli.income {\n    border-left-color: #28a745;\n}\n\nli.expense {\n    border-left-color: #dc3545;\n}\n\n#transactionList li:last-child {\n    margin-bottom: 0;\n}"
+    }
+  },
+  "history": [
+    {
+      "at": "2026-10-14T04:09:01Z",
+      "by": "user-kgw7z",
+      "kind": "create",
+      "model": "qwen3-coder:30b",
+      "request": "做一個簡單的記帳本：可以新增收入或支出（金額和說明），列出所有紀錄，並在上方顯示目前餘額",
+      "summary": "一個簡單的記帳本應用程式，允許使用者新增收入或支出記錄，並顯示所有交易紀錄與目前餘額。"
+    }
+  ],
+  "plan": {
+    "appName": "demo-ledger",
+    "components": {
+      "api": {
+        "endpoints": [
+          {
+            "method": "GET",
+            "path": "/transactions",
+            "purpose": "取得所有交易紀錄"
+          },
+          {
+            "method": "POST",
+            "path": "/transactions",
+            "purpose": "新增一筆交易紀錄"
+          },
+          {
+            "method": "GET",
+            "path": "/balance",
+            "purpose": "取得目前帳戶餘額"
+          }
+        ],
+        "modules": [
+          {
+            "name": "account_api.py",
+            "purpose": "處理記帳本的API邏輯，包含交易紀錄管理與餘額計算"
+          }
+        ]
+      },
+      "web": {
+        "modules": [
+          {
+            "name": "index.html",
+            "purpose": "應用程式的主頁面，包含輸入表單與紀錄顯示區"
+          },
+          {
+            "name": "app.js",
+            "purpose": "處理前端互動邏輯，包括表單提交、資料更新與畫面渲染"
+          },
+          {
+            "name": "style.css",
+            "purpose": "定義網頁樣式與版面配置"
+          }
+        ]
+      }
+    },
+    "notes": "此應用程式使用記憶體儲存資料，不包含永久儲存功能。所有交易紀錄與餘額計算均在伺服器記憶體中進行處理。",
+    "steps": [
+      "建立前端網頁結構，包含輸入表單、紀錄列表和餘額顯示區域",
+      "實作前端JavaScript處理表單提交與畫面更新",
+      "設計API模組以儲存交易資料並提供讀取功能",
+      "實現GET /transactions端點用於取得所有交易紀錄",
+      "實現POST /transactions端點用於新增交易紀錄",
+      "實現GET /balance端點用於取得目前餘額",
+      "設定前端與後端API的連接與資料傳遞",
+      "測試新增交易功能是否正確儲存並顯示",
+      "驗證餘額計算是否準確反映所有交易",
+      "確認網頁介面在不同瀏覽器下正常運作"
+    ],
+    "summary": "一個簡單的記帳本應用程式，允許使用者新增收入或支出記錄，並顯示所有交易紀錄與目前餘額。"
+  },
+  "schema": 1
+}
