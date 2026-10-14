@@ -40,8 +40,22 @@
       "model": "",
       "request": "改標題",
       "summary": "一個簡單的待辦清單應用程式，允許使用者新增、標記完成和刪除待辦事項。"
+    },
+    {
+      "at": "2026-10-14T06:01:59Z",
+      "by": "user-kgw7z",
+      "kind": "layout",
+      "model": "",
+      "request": "調整 3D 版面",
+      "summary": "一個簡單的待辦清單應用程式，允許使用者新增、標記完成和刪除待辦事項。"
     }
   ],
+  "layout": {
+    "mod-api-todo-api-py": {
+      "x": 4.7,
+      "z": -1.0
+    }
+  },
   "plan": {
     "appName": "todo",
     "components": {
