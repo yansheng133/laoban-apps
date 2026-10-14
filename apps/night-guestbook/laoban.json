@@ -32,8 +32,22 @@
       "model": "",
       "request": "t13 範圍外",
       "summary": "建立一個簡易留言板應用程式，具備留言、點讚、刪除及依時間排序功能。"
+    },
+    {
+      "at": "2026-10-14T10:22:47Z",
+      "by": "user-kgw7z",
+      "kind": "layout",
+      "model": "",
+      "request": "調整 3D 版面",
+      "summary": "建立一個簡易留言板應用程式，具備留言、點讚、刪除及依時間排序功能。"
     }
   ],
+  "layout": {
+    "mod-api-message-board-api-py": {
+      "x": 5.5,
+      "z": 1.7
+    }
+  },
   "plan": {
     "appName": "night-guestbook",
     "components": {
