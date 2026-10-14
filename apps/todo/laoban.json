@@ -112,9 +112,21 @@
       "model": "qwen3-coder:30b",
       "request": "以下是 1 則對這個應用的意見（可能重複或互相衝突）：\n1. （laoban-cli-test）handler.py 的回應加上 count",
       "summary": "一個簡單的待辦清單應用程式，允許使用者新增、標記完成和刪除待辦事項，並支援優先權排序功能。在 API 回傳中新增 count 欄位以顯示總數。"
+    },
+    {
+      "at": "2026-10-14T12:13:48Z",
+      "by": "user-kgw7z",
+      "kind": "layout",
+      "model": "",
+      "request": "調整 3D 版面",
+      "summary": "一個簡單的待辦清單應用程式，允許使用者新增、標記完成和刪除待辦事項，並支援優先權排序功能。在 API 回傳中新增 count 欄位以顯示總數。"
     }
   ],
   "layout": {
+    "mod-api-priority-py": {
+      "x": 2.9,
+      "z": 4.0
+    },
     "mod-api-todo-core-py": {
       "x": 4.7,
       "z": -2.2
