@@ -21,7 +21,7 @@ spec:
         app.kubernetes.io/name: "todo-web"
         app.kubernetes.io/component: "web"
       annotations:
-        laoban.io/content-hash: "f5dc66d1e3f2fbd43403b20b16c69c7193e804aec315025279040e3ab9c34133"
+        laoban.io/content-hash: "4584f76b36a7d450db62958011927a2d72d44b2bdd25cda0a9f41e4c81bea72f"
     spec:
       automountServiceAccountToken: false
       securityContext:
