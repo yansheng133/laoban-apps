@@ -21,7 +21,7 @@ spec:
         app.kubernetes.io/name: "night-guestbook-api"
         app.kubernetes.io/component: "api"
       annotations:
-        laoban.io/content-hash: "151badae81024af11d7f12c82dac278c65862097d9dd50e4be1362ee55247900"
+        laoban.io/content-hash: "698c790b2b419a6ddacece2c66143b2e2f0a41dece6a615ae5e3ec0cc288822b"
     spec:
       automountServiceAccountToken: false
       securityContext:
