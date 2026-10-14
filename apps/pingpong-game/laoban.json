@@ -1,0 +1,96 @@
+{
+  "appName": "pingpong-game",
+  "files": {
+    "api": {
+      "handler.py": "import json\n\ngame_state = {\n    'running': False,\n    'player_score': 0,\n    'computer_score': 0,\n    'paddle_position': {'y': 160},  # 初始位置在畫布中央\n}\n\n\ndef handle(method, path, body):\n    global game_state\n    \n    if path == '/game/start' and method == 'POST':\n        game_state['running'] = True\n        return (200, {'message': '遊戲已開始'})\n    \n    elif path == '/game/update' and method == 'PUT':\n        data = json.loads(body)\n        # 這裡可以更新遊戲狀態，但由於我們使用記憶體儲存，\n        # 這裡的邏輯主要用於處理遊戲邏輯\n        return (200, {'message': '遊戲狀態已更新'})\n    \n    elif path == '/game/score' and method == 'GET':\n        return (200, {\n            'player_score': game_state['player_score'],\n            'computer_score': game_state['computer_score']\n        })\n    \n    elif path == '/game/reset' and method == 'POST':\n        game_state['running'] = False\n        game_state['player_score'] = 0\n        game_state['computer_score'] = 0\n        game_state['paddle_position']['y'] = 160\n        return (200, {'message': '遊戲已重置'})\n    \n    elif path == '/paddle/move' and method == 'PUT':\n        data = json.loads(body)\n        if 'y' in data:\n            game_state['paddle_position']['y'] = data['y']\n        elif 'direction' in data:\n            # 根據方向移動球拍\n            current_y = game_state['paddle_position']['y']\n            if data['direction'] == 'up':\n                game_state['paddle_position']['y'] = max(0, current_y - 10)\n            elif data['direction'] == 'down':\n                game_state['paddle_position']['y'] = min(320, current_y + 10)\n        return (200, {'message': '球拍位置已更新'})\n    \n    else:\n        return (404, {'error': '端點未找到'})"
+    },
+    "web": {
+      "app.js": "const canvas = document.getElementById('gameCanvas');\nconst ctx = canvas.getContext('2d');\n\n// 遊戲狀態\nlet gameRunning = false;\nlet playerScore = 0;\nlet computerScore = 0;\n\n// 球拍和球的屬性\nlet paddleWidth = 10;\nlet paddleHeight = 80;\nlet ballSize = 10;\n\nlet playerPaddle = {\n    x: 20,\n    y: canvas.height / 2 - paddleHeight / 2,\n    width: paddleWidth,\n    height: paddleHeight,\n    speed: 8\n};\n\nlet computerPaddle = {\n    x: canvas.width - 30,\n    y: canvas.height / 2 - paddleHeight / 2,\n    width: paddleWidth,\n    height: paddleHeight,\n    speed: 6\n};\n\nlet ball = {\n    x: canvas.width / 2,\n    y: canvas.height / 2,\n    size: ballSize,\n    dx: 5,\n    dy: 5,\n    speed: 5\n};\n\n// 初始化遊戲\nfunction initGame() {\n    playerScore = 0;\n    computerScore = 0;\n    updateScore();\n    resetBall();\n    gameRunning = true;\n}\n\n// 重置球的位置\nfunction resetBall() {\n    ball.x = canvas.width / 2;\n    ball.y = canvas.height / 2;\n    \n    // 隨機方向\n    ball.dx = (Math.random() > 0.5 ? 1 : -1) * ball.speed;\n    ball.dy = (Math.random() * 2 - 1) * ball.speed;\n}\n\n// 更新得分顯示\nfunction updateScore() {\n    document.getElementById('player-score').textContent = `玩家: ${playerScore}`;\n    document.getElementById('computer-score').textContent = `電腦: ${computerScore}`;\n}\n\n// 繪製遊戲元素\nfunction draw() {\n    // 清除畫布\n    ctx.clearRect(0, 0, canvas.width, canvas.height);\n    \n    // 繪製球拍\n    ctx.fillStyle = '#000';\n    ctx.fillRect(playerPaddle.x, playerPaddle.y, playerPaddle.width, playerPaddle.height);\n    ctx.fillRect(computerPaddle.x, computerPaddle.y, computerPaddle.width, computerPaddle.height);\n    \n    // 繪製球\n    ctx.beginPath();\n    ctx.arc(ball.x, ball.y, ball.size, 0, Math.PI * 2);\n    ctx.fillStyle = '#000';\n    ctx.fill();\n    ctx.closePath();\n}\n\n// 更新遊戲狀態\nfunction update() {\n    if (!gameRunning) return;\n    \n    // 移動球\n    ball.x += ball.dx;\n    ball.y += ball.dy;\n    \n    // 球碰到上下邊界\n    if (ball.y - ball.size < 0 || ball.y + ball.size > canvas.height) {\n        ball.dy = -ball.dy;\n    }\n    \n    // 球碰到球拍\n    if (\n        ball.x - ball.size < playerPaddle.x + playerPaddle.width &&\n        ball.y > playerPaddle.y &&\n        ball.y < playerPaddle.y + playerPaddle.height &&\n        ball.dx < 0\n    ) {\n        ball.dx = -ball.dx;\n        // 根據球拍位置調整球的方向和速度\n        let hitPosition = (ball.y - (playerPaddle.y + playerPaddle.height / 2)) / (playerPaddle.height / 2);\n        ball.dy = hitPosition * 5;\n    }\n    \n    if (\n        ball.x + ball.size > computerPaddle.x &&\n        ball.y > computerPaddle.y &&\n        ball.y < computerPaddle.y + computerPaddle.height &&\n        ball.dx > 0\n    ) {\n        ball.dx = -ball.dx;\n        // 根據球拍位置調整球的方向和速度\n        let hitPosition = (ball.y - (computerPaddle.y + computerPaddle.height / 2)) / (computerPaddle.height / 2);\n        ball.dy = hitPosition * 5;\n    }\n    \n    // 球出界\n    if (ball.x < 0) {\n        computerScore++;\n        updateScore();\n        resetBall();\n    } else if (ball.x > canvas.width) {\n        playerScore++;\n        updateScore();\n        resetBall();\n    }\n    \n    // 電腦球拍追蹤球\n    computerPaddle.y += (ball.y - (computerPaddle.y + computerPaddle.height / 2)) * 0.05;\n    \n    // 限制電腦球拍移動範圍\n    if (computerPaddle.y < 0) {\n        computerPaddle.y = 0;\n    } else if (computerPaddle.y + computerPaddle.height > canvas.height) {\n        computerPaddle.y = canvas.height - computerPaddle.height;\n    }\n    \n    // 更新畫面\n    draw();\n}\n\n// 遊戲主循環\nfunction gameLoop() {\n    update();\n    requestAnimationFrame(gameLoop);\n}\n\n// 控制球拍移動\nfunction movePaddle(direction) {\n    if (!gameRunning) return;\n    \n    fetch('api/paddle/move', {\n        method: 'PUT',\n        headers: {\n            'Content-Type': 'application/json'\n        },\n        body: JSON.stringify({ direction })\n    });\n}\n\n// 開始遊戲\nfunction startGame() {\n    if (gameRunning) return;\n    \n    fetch('api/game/start', {\n        method: 'POST',\n        headers: {\n            'Content-Type': 'application/json'\n        }\n    }).then(response => response.json()).then(data => {\n        initGame();\n    });\n}\n\n// 重置遊戲\nfunction resetGame() {\n    fetch('api/game/reset', {\n        method: 'POST',\n        headers: {\n            'Content-Type': 'application/json'\n        }\n    }).then(response => response.json()).then(data => {\n        initGame();\n    });\n}\n\n// 設置事件監聽器\ndocument.getElementById('startBtn').addEventListener('click', startGame);\ndocument.getElementById('resetBtn').addEventListener('click', resetGame);\n\n// 鼠標控制球拍\ncanvas.addEventListener('mousemove', (e) => {\n    if (!gameRunning) return;\n    \n    const rect = canvas.getBoundingClientRect();\n    const mouseY = e.clientY - rect.top;\n    \n    playerPaddle.y = mouseY - playerPaddle.height / 2;\n    \n    // 限制球拍移動範圍\n    if (playerPaddle.y < 0) {\n        playerPaddle.y = 0;\n    } else if (playerPaddle.y + playerPaddle.height > canvas.height) {\n        playerPaddle.y = canvas.height - playerPaddle.height;\n    }\n    \n    // 發送球拍位置更新到伺服器\n    fetch('api/paddle/move', {\n        method: 'PUT',\n        headers: {\n            'Content-Type': 'application/json'\n        },\n        body: JSON.stringify({ y: playerPaddle.y })\n    });\n});\n\n// 初始化遊戲\ninitGame();\ngameLoop();",
+      "index.html": "<!DOCTYPE html>\n<html lang=\"zh-TW\">\n<head>\n    <meta charset=\"UTF-8\">\n    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n    <title>乒乓球遊戲</title>\n    <link rel=\"stylesheet\" href=\"style.css\">\n</head>\n<body>\n    <div class=\"game-container\">\n        <h1>乒乓球遊戲</h1>\n        <div class=\"score-board\">\n            <span id=\"player-score\">玩家: 0</span>\n            <span id=\"computer-score\">電腦: 0</span>\n        </div>\n        <canvas id=\"gameCanvas\" width=\"800\" height=\"400\"></canvas>\n        <div class=\"controls\">\n            <button id=\"startBtn\">開始遊戲</button>\n            <button id=\"resetBtn\">重置遊戲</button>\n        </div>\n        <div class=\"instructions\">\n            <p>使用滑鼠或觸控板控制球拍移動</p>\n        </div>\n    </div>\n    <script src=\"app.js\"></script>\n</body>\n</html>",
+      "style.css": "body {\n    font-family: Arial, sans-serif;\n    margin: 0;\n    padding: 20px;\n    background-color: #f0f0f0;\n}\n\n.game-container {\n    text-align: center;\n    max-width: 800px;\n    margin: auto;\n    background-color: white;\n    padding: 20px;\n    border-radius: 10px;\n    box-shadow: 0 0 10px rgba(0,0,0,0.1);\n}\n\nh1 {\n    color: #333;\n    margin-bottom: 10px;\n}\n\n.score-board {\n    font-size: 24px;\n    font-weight: bold;\n    margin-bottom: 20px;\n    display: flex;\n    justify-content: space-around;\n}\n\n#gameCanvas {\n    border: 2px solid #333;\n    background-color: #fff;\n    cursor: pointer;\n}\n\n.controls {\n    margin-top: 20px;\n}\n\nbutton {\n    font-size: 16px;\n    padding: 10px 20px;\n    margin: 0 10px;\n    background-color: #4CAF50;\n    color: white;\n    border: none;\n    border-radius: 5px;\n    cursor: pointer;\n}\n\nbutton:hover {\n    background-color: #45a049;\n}\n\n.instructions {\n    margin-top: 20px;\n    font-size: 14px;\n    color: #666;\n}"
+    }
+  },
+  "history": [
+    {
+      "at": "2026-10-14T03:49:51Z",
+      "by": "user-kgw7z",
+      "kind": "create",
+      "model": "qwen3-coder:30b",
+      "request": "乒乓球遊戲",
+      "summary": "一個簡單的乒乓球遊戲，玩家可以控制球拍來擊打乒乓球，遊戲會計算得分並顯示在畫面上。"
+    }
+  ],
+  "plan": {
+    "appName": "pingpong-game",
+    "components": {
+      "api": {
+        "endpoints": [
+          {
+            "method": "POST",
+            "path": "/game/start",
+            "purpose": "啟動新的乒乓球遊戲"
+          },
+          {
+            "method": "PUT",
+            "path": "/game/update",
+            "purpose": "更新遊戲狀態，如球的位置與得分"
+          },
+          {
+            "method": "GET",
+            "path": "/game/score",
+            "purpose": "取得當前遊戲得分"
+          },
+          {
+            "method": "POST",
+            "path": "/game/reset",
+            "purpose": "重置遊戲狀態為初始設定"
+          },
+          {
+            "method": "PUT",
+            "path": "/paddle/move",
+            "purpose": "控制球拍移動位置"
+          }
+        ],
+        "modules": [
+          {
+            "name": "api.py",
+            "purpose": "提供遊戲狀態管理與資料處理的後端 API"
+          }
+        ]
+      },
+      "web": {
+        "modules": [
+          {
+            "name": "index.html",
+            "purpose": "遊戲主頁面，包含遊戲畫布和控制按鈕"
+          },
+          {
+            "name": "style.css",
+            "purpose": "定義遊戲畫面的樣式與排版"
+          },
+          {
+            "name": "app.js",
+            "purpose": "處理遊戲邏輯、使用者互動與 API 通訊"
+          }
+        ]
+      }
+    },
+    "notes": "此應用程式使用標準 Python 庫實現，所有資料儲存在記憶體中。前端使用 HTML、CSS 和 JavaScript 實現遊戲畫面與互動功能。API 提供基本的遊戲控制與狀態管理端點。",
+    "steps": [
+      "創建前端 HTML 檔案 index.html 包含遊戲畫面和控制按鈕",
+      "撰寫前端 CSS 樣式 style.css 以美化遊戲畫面",
+      "開發前端 JavaScript app.js 實現遊戲邏輯與互動功能",
+      "建立 API 模組 api.py 用於處理遊戲狀態與資料",
+      "實作 API 端點 /game/start 啟動新遊戲",
+      "實作 API 端點 /game/update 更新遊戲狀態",
+      "實作 API 端點 /game/score 取得目前得分",
+      "實作 API 端點 /game/reset 重置遊戲",
+      "實作 API 端點 /paddle/move 控制球拍移動",
+      "整合前端與後端 API，實現完整遊戲功能",
+      "測試遊戲在瀏覽器中的運作",
+      "調整遊戲平衡與使用者體驗"
+    ],
+    "summary": "一個簡單的乒乓球遊戲，玩家可以控制球拍來擊打乒乓球，遊戲會計算得分並顯示在畫面上。"
+  },
+  "schema": 1
+}
