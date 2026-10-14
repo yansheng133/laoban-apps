@@ -4,7 +4,8 @@
 
 ## 這次的需求（已遮蔽）
 
-> Rename module "todo_logic.py" to "todo_core.py".
+> 以下是 1 則對這個應用的意見（可能重複或互相衝突）：
+> 1. （user-kgw7z）標題改成 待辦清單
 
 ## 計畫摘要
 
@@ -12,7 +13,7 @@
 
 ## 產生資訊
 
-- 產生時間：2026-10-14T06:56:43Z
+- 產生時間：2026-10-14T10:17:44Z
 - 模型：`qwen3-coder:30b`
 - 部署目標 namespace：`laoban-dev`
 - 映像：`registry.suse.com/bci/python:3.13`
