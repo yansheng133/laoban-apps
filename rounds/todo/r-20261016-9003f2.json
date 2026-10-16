@@ -1,0 +1,49 @@
+{
+  "app": "todo",
+  "archivedAt": "2026-10-16T12:45:06Z",
+  "openedAt": "2026-10-16T12:45:05Z",
+  "round": {
+    "app": "todo",
+    "confirmers": [],
+    "deadline": 1792155305,
+    "id": "r-20261016-9003f2",
+    "initiator": "laoban-cli-test",
+    "log": [
+      {
+        "args": {
+          "minutes": "10"
+        },
+        "at": "2026-10-16T12:45:05Z",
+        "by": "laoban-cli-test",
+        "code": "opened",
+        "event": "開始一輪（10 分鐘後收斂）"
+      },
+      {
+        "at": "2026-10-16T12:45:06Z",
+        "by": "laoban-cli-test",
+        "code": "cancelled",
+        "event": "取消這一輪"
+      }
+    ],
+    "message": "",
+    "opinions": [
+      {
+        "at": "2026-10-16T12:45:05Z",
+        "by": "laoban-cli-test",
+        "id": "o1",
+        "replies": [],
+        "supporters": [],
+        "text": "t21-B14 截止時間上限測試"
+      }
+    ],
+    "plan": null,
+    "result": null,
+    "scope": [
+      "web",
+      "api"
+    ],
+    "state": "cancelled"
+  },
+  "schema": 1,
+  "targetNamespace": "laoban-dev"
+}
