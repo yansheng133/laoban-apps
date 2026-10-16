@@ -1,0 +1,166 @@
+{
+  "app": "demo-board",
+  "archivedAt": "2026-10-16T16:32:21Z",
+  "openedAt": "2026-10-16T16:27:20Z",
+  "round": {
+    "app": "demo-board",
+    "confirmers": [],
+    "deadline": 1792171640,
+    "id": "r-20261016-0e7687",
+    "initiator": "user-kgw7z",
+    "log": [
+      {
+        "args": {
+          "minutes": "60"
+        },
+        "at": "2026-10-16T16:27:20Z",
+        "by": "user-kgw7z",
+        "code": "opened",
+        "event": "開始一輪（60 分鐘後收斂）"
+      },
+      {
+        "args": {
+          "count": "2"
+        },
+        "at": "2026-10-16T16:27:27Z",
+        "by": "laoban-cli-test",
+        "code": "opinion",
+        "event": "提出 2 則意見"
+      },
+      {
+        "args": {
+          "count": "1"
+        },
+        "at": "2026-10-16T16:27:28Z",
+        "by": "laoban-cli-test2",
+        "code": "opinion",
+        "event": "提出 1 則意見"
+      },
+      {
+        "args": {
+          "opinion": "o1"
+        },
+        "at": "2026-10-16T16:27:33Z",
+        "by": "laoban-cli-test2",
+        "code": "supported",
+        "event": "附議意見 o1"
+      },
+      {
+        "args": {
+          "opinion": "o2"
+        },
+        "at": "2026-10-16T16:27:33Z",
+        "by": "laoban-cli-test2",
+        "code": "supported",
+        "event": "附議意見 o2"
+      },
+      {
+        "args": {
+          "opinion": "o4"
+        },
+        "at": "2026-10-16T16:27:33Z",
+        "by": "laoban-cli-test",
+        "code": "supported",
+        "event": "附議意見 o4"
+      },
+      {
+        "args": {
+          "opinion": "o1"
+        },
+        "at": "2026-10-16T16:27:33Z",
+        "by": "laoban-cli-test",
+        "code": "replied",
+        "event": "回覆意見 o1"
+      },
+      {
+        "args": {
+          "opinion": "o2"
+        },
+        "at": "2026-10-16T16:27:33Z",
+        "by": "laoban-cli-test2",
+        "code": "replied",
+        "event": "回覆意見 o2"
+      },
+      {
+        "at": "2026-10-16T16:32:20Z",
+        "by": "user-kgw7z",
+        "code": "cancelled",
+        "event": "取消這一輪"
+      }
+    ],
+    "message": "",
+    "opinions": [
+      {
+        "at": "2026-10-16T16:27:20Z",
+        "by": "user-kgw7z",
+        "id": "o1",
+        "replies": [
+          {
+            "at": "2026-10-16T16:27:33Z",
+            "by": "laoban-cli-test",
+            "text": "可以先用暱稱，之後再接帳號"
+          }
+        ],
+        "supporters": [
+          "laoban-cli-test2"
+        ],
+        "text": "留言旁顯示發表人的名稱"
+      },
+      {
+        "at": "2026-10-16T16:27:27Z",
+        "by": "laoban-cli-test",
+        "id": "o2",
+        "replies": [
+          {
+            "at": "2026-10-16T16:27:33Z",
+            "by": "laoban-cli-test2",
+            "text": "同意，這樣比較直覺"
+          }
+        ],
+        "supporters": [
+          "laoban-cli-test2"
+        ],
+        "target": {
+          "id": "app-web",
+          "name": "demo-board-web"
+        },
+        "text": "讚數一樣時，新的排前面"
+      },
+      {
+        "at": "2026-10-16T16:27:27Z",
+        "by": "laoban-cli-test",
+        "id": "o3",
+        "replies": [],
+        "supporters": [],
+        "target": {
+          "id": "svc-web",
+          "name": "demo-board-web"
+        },
+        "text": "刪除前要再問一次"
+      },
+      {
+        "at": "2026-10-16T16:27:28Z",
+        "by": "laoban-cli-test2",
+        "id": "o4",
+        "replies": [],
+        "supporters": [
+          "laoban-cli-test"
+        ],
+        "target": {
+          "id": "app-api",
+          "name": "demo-board-api"
+        },
+        "text": "API 回傳每則留言的讚數"
+      }
+    ],
+    "plan": null,
+    "result": null,
+    "scope": [
+      "web",
+      "api"
+    ],
+    "state": "cancelled"
+  },
+  "schema": 1,
+  "targetNamespace": "laoban-dev"
+}
