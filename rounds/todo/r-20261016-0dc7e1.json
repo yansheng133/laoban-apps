@@ -1,0 +1,68 @@
+{
+  "app": "todo",
+  "archivedAt": "2026-10-16T15:41:11Z",
+  "openedAt": "2026-10-16T15:40:46Z",
+  "round": {
+    "app": "todo",
+    "confirmers": [],
+    "deadline": 1792165246,
+    "id": "r-20261016-0dc7e1",
+    "initiator": "laoban-cli-test",
+    "log": [
+      {
+        "args": {
+          "minutes": "0"
+        },
+        "at": "2026-10-16T15:40:46Z",
+        "by": "laoban-cli-test",
+        "code": "opened",
+        "event": "開始一輪（0 分鐘後收斂）"
+      },
+      {
+        "args": {
+          "count": "1"
+        },
+        "at": "2026-10-16T15:40:46Z",
+        "by": "laoban",
+        "code": "converging",
+        "event": "AI 開始收斂 1 則意見"
+      },
+      {
+        "args": {
+          "code": "budgetExceeded",
+          "message": "已達到 laoban 本期的 AI token 使用上限，請等下個月或請管理者調高上限。"
+        },
+        "at": "2026-10-16T15:40:47Z",
+        "by": "laoban",
+        "code": "failed",
+        "event": "失敗：已達到 laoban 本期的 AI token 使用上限，請等下個月或請管理者調高上限。"
+      },
+      {
+        "at": "2026-10-16T15:40:59Z",
+        "by": "laoban-cli-test",
+        "code": "cancelled",
+        "event": "取消這一輪"
+      }
+    ],
+    "message": "已達到 laoban 本期的 AI token 使用上限，請等下個月或請管理者調高上限。",
+    "messageCode": "budgetExceeded",
+    "opinions": [
+      {
+        "at": "2026-10-16T15:40:46Z",
+        "by": "laoban-cli-test",
+        "id": "o1",
+        "replies": [],
+        "supporters": [],
+        "text": "t22-A10 A：待辦項目加上到期日"
+      }
+    ],
+    "plan": null,
+    "result": null,
+    "scope": [
+      "web"
+    ],
+    "state": "cancelled"
+  },
+  "schema": 1,
+  "targetNamespace": "laoban-dev"
+}
