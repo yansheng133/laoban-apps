@@ -21,7 +21,7 @@ spec:
         app.kubernetes.io/name: "demo-board-api"
         app.kubernetes.io/component: "api"
       annotations:
-        laoban.io/content-hash: "741cc6d2a21478ac899804e12b64bae288458f3469c52f4b5f9bd27c5987fc09"
+        laoban.io/content-hash: "1f9a5740ac6fa853f568cff88a01e2033dad618ff53054504845498cb16c028f"
     spec:
       automountServiceAccountToken: false
       securityContext:
