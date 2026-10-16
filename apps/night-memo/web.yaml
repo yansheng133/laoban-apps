@@ -21,7 +21,7 @@ spec:
         app.kubernetes.io/name: "night-memo-web"
         app.kubernetes.io/component: "web"
       annotations:
-        laoban.io/content-hash: "5ffa9ce3214b4c6564fbd3571021d7f08c612604e94ef4fc844b27ca8fcef164"
+        laoban.io/content-hash: "03bc55728b658b554575570cdf75159b20543a3c06dd740929dee2ea64f0a02c"
     spec:
       automountServiceAccountToken: false
       securityContext:
