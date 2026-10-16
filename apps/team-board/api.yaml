@@ -21,7 +21,7 @@ spec:
         app.kubernetes.io/name: "team-board-api"
         app.kubernetes.io/component: "api"
       annotations:
-        laoban.io/content-hash: "792635a3255f22816d4fa4dce2f38fb3aa9d616d0361be6e053059558b4c6777"
+        laoban.io/content-hash: "ecb6d9f242dd23f3f6d98868458f5c877b92d052505a38588b766bf3bdfaa8b7"
     spec:
       automountServiceAccountToken: false
       securityContext:

@@ -21,7 +21,7 @@ spec:
         app.kubernetes.io/name: "team-board-web"
         app.kubernetes.io/component: "web"
       annotations:
-        laoban.io/content-hash: "2982703d4fa2b0cb3cbe8dde8782999015abf43c40fe1eb7ec2e2f7c6633e516"
+        laoban.io/content-hash: "90ec470beac5a222bc6b7a255443e8346ff8bece864cda5c6037953853f5a8b6"
     spec:
       automountServiceAccountToken: false
       securityContext:
