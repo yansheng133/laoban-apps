@@ -1,0 +1,66 @@
+{
+  "app": "todo",
+  "archivedAt": "2026-10-16T13:39:00Z",
+  "openedAt": "2026-10-16T13:38:29Z",
+  "round": {
+    "app": "todo",
+    "confirmers": [],
+    "deadline": 1792158509,
+    "id": "r-20261016-d46be6",
+    "initiator": "u-pc66f",
+    "log": [
+      {
+        "args": {
+          "minutes": "10"
+        },
+        "at": "2026-10-16T13:38:29Z",
+        "by": "u-pc66f",
+        "code": "opened",
+        "event": "開始一輪（10 分鐘後收斂）"
+      },
+      {
+        "args": {
+          "count": "1"
+        },
+        "at": "2026-10-16T13:38:42Z",
+        "by": "u-pc66f",
+        "code": "opinion",
+        "event": "提出 1 則意見"
+      },
+      {
+        "at": "2026-10-16T13:38:56Z",
+        "by": "u-pc66f",
+        "code": "cancelled",
+        "event": "取消這一輪"
+      }
+    ],
+    "message": "",
+    "opinions": [
+      {
+        "at": "2026-10-16T13:38:29Z",
+        "by": "u-pc66f",
+        "id": "o1",
+        "replies": [],
+        "supporters": [],
+        "text": "t21-D3 laoban user 開一輪"
+      },
+      {
+        "at": "2026-10-16T13:38:42Z",
+        "by": "u-pc66f",
+        "id": "o2",
+        "replies": [],
+        "supporters": [],
+        "text": "t21-D3 C 的第二則意見"
+      }
+    ],
+    "plan": null,
+    "result": null,
+    "scope": [
+      "web",
+      "api"
+    ],
+    "state": "cancelled"
+  },
+  "schema": 1,
+  "targetNamespace": "laoban-dev"
+}
