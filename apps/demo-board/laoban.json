@@ -1,0 +1,89 @@
+{
+  "appName": "demo-board",
+  "files": {
+    "api": {
+      "handler.py": "import time\nimport json\nimport uuid\nfrom datetime import datetime\n\n# 留言資料儲存在記憶體中\nmessages = []\n\n\ndef handle(method, path, body):\n    if method == \"GET\" and path == \"/messages\":\n        # 按時間順序排列，最新的在最上面\n        sorted_messages = sorted(messages, key=lambda x: x[\"timestamp\"], reverse=True)\n        return (200, sorted_messages)\n    \n    elif method == \"POST\" and path == \"/messages\":\n        try:\n            data = json.loads(body.decode())\n            content = data.get(\"content\")\n            if not content:\n                return (400, {\"error\": \"內容不能為空\"})\n            \n            # 建立新的留言\n            new_message = {\n                \"id\": str(uuid.uuid4()),\n                \"content\": content,\n                \"timestamp\": datetime.now().isoformat(),\n                \"likes\": 0\n            }\n            \n            messages.append(new_message)\n            return (201, new_message)\n        except json.JSONDecodeError:\n            return (400, {\"error\": \"無效的JSON格式\"})\n    \n    elif method == \"PUT\" and path.startswith(\"/messages/\") and path.endswith(\"/like\"):\n        # 提取留言ID\n        message_id = path.split(\"/\")[3]\n        \n        for message in messages:\n            if message[\"id\"] == message_id:\n                message[\"likes\"] += 1\n                return (200, message)\n        \n        return (404, {\"error\": \"留言未找到\"})\n    \n    elif method == \"DELETE\" and path.startswith(\"/messages/\"):\n        # 提取留言ID\n        message_id = path.split(\"/\")[3]\n        \n        for i, message in enumerate(messages):\n            if message[\"id\"] == message_id:\n                del messages[i]\n                return (200, {\"message\": \"留言已刪除\"})\n        \n        return (404, {\"error\": \"留言未找到\"})\n    \n    else:\n        return (404, {\"error\": \"路徑不存在\"})"
+    },
+    "web": {
+      "app.js": "document.addEventListener('DOMContentLoaded', () => {\n    const messageForm = document.getElementById('messageForm');\n    const messageInput = document.getElementById('messageInput');\n    const messagesContainer = document.getElementById('messagesContainer');\n\n    // 獲取所有留言並顯示\n    async function loadMessages() {\n        try {\n            const response = await fetch('api/messages');\n            const messages = await response.json();\n            displayMessages(messages);\n        } catch (error) {\n            console.error('獲取留言失敗:', error);\n        }\n    }\n\n    // 顯示留言列表\n    function displayMessages(messages) {\n        messagesContainer.innerHTML = '';\n        \n        if (messages.length === 0) {\n            messagesContainer.innerHTML = '<p>目前沒有留言</p>';\n            return;\n        }\n        \n        messages.forEach(message => {\n            const messageElement = document.createElement('div');\n            messageElement.className = 'message';\n            messageElement.innerHTML = `\n                <p>${message.content}</p>\n                <div class=\"message-info\">\n                    <span>時間: ${new Date(message.timestamp).toLocaleString('zh-TW')}</span>\n                    <div class=\"actions\">\n                        <button onclick=\"likeMessage('${message.id}')\" class=\"like-btn\">👍 ${message.likes}</button>\n                        <button onclick=\"deleteMessage('${message.id}')\" class=\"delete-btn\">🗑️</button>\n                    </div>\n                </div>\n            `;\n            messagesContainer.appendChild(messageElement);\n        });\n    }\n\n    // 新增留言\n    messageForm.addEventListener('submit', async (e) => {\n        e.preventDefault();\n        \n        const content = messageInput.value.trim();\n        if (!content) return;\n        \n        try {\n            const response = await fetch('api/messages', {\n                method: 'POST',\n                headers: {\n                    'Content-Type': 'application/json'\n                },\n                body: JSON.stringify({ content })\n            });\n            \n            if (response.ok) {\n                messageInput.value = '';\n                loadMessages(); // 重新載入留言\n            } else {\n                console.error('新增留言失敗');\n            }\n        } catch (error) {\n            console.error('網路錯誤:', error);\n        }\n    });\n\n    // 按讚功能\n    window.likeMessage = async (id) => {\n        try {\n            const response = await fetch(`api/messages/${id}/like`, {\n                method: 'PUT'\n            });\n            \n            if (response.ok) {\n                loadMessages(); // 重新載入留言\n            } else {\n                console.error('按讚失敗');\n            }\n        } catch (error) {\n            console.error('網路錯誤:', error);\n        }\n    };\n\n    // 刪除留言\n    window.deleteMessage = async (id) => {\n        if (!confirm('確定要刪除這則留言嗎？')) return;\n        \n        try {\n            const response = await fetch(`api/messages/${id}`, {\n                method: 'DELETE'\n            });\n            \n            if (response.ok) {\n                loadMessages(); // 重新載入留言\n            } else {\n                console.error('刪除留言失敗');\n            }\n        } catch (error) {\n            console.error('網路錯誤:', error);\n        }\n    };\n\n    // 頁面載入時獲取留言\n    loadMessages();\n});",
+      "index.html": "<!DOCTYPE html>\n<html lang=\"zh-TW\">\n<head>\n    <meta charset=\"UTF-8\">\n    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n    <title>留言板</title>\n    <link rel=\"stylesheet\" href=\"style.css\">\n</head>\n<body>\n    <div class=\"container\">\n        <h1>留言板</h1>\n        \n        <!-- 留言輸入表單 -->\n        <form id=\"messageForm\">\n            <textarea id=\"messageInput\" placeholder=\"請輸入您的留言...\" required></textarea>\n            <button type=\"submit\">送出留言</button>\n        </form>\n        \n        <!-- 留言列表 -->\n        <div id=\"messagesContainer\"></div>\n    </div>\n    \n    <script src=\"app.js\"></script>\n</body>\n</html>",
+      "style.css": "body {\n    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;\n    background-color: #f5f5f5;\n    margin: 0;\n    padding: 20px;\n}\n\n.container {\n    max-width: 800px;\n    margin: 0 auto;\n    background-color: white;\n    border-radius: 10px;\n    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);\n    padding: 20px;\n}\n\nh1 {\n    text-align: center;\n    color: #333;\n    margin-bottom: 30px;\n}\n\n#messageForm {\n    display: flex;\n    flex-direction: column;\n    gap: 10px;\n    margin-bottom: 30px;\n}\n\n#messageInput {\n    padding: 12px;\n    border: 1px solid #ddd;\n    border-radius: 5px;\n    font-size: 16px;\n    resize: vertical;\n    min-height: 100px;\n}\n\nbutton[type=\"submit\"] {\n    padding: 12px 20px;\n    background-color: #4CAF50;\n    color: white;\n    border: none;\n    border-radius: 5px;\n    cursor: pointer;\n    font-size: 16px;\n    transition: background-color 0.3s;\n}\n\nbutton[type=\"submit\"]:hover {\n    background-color: #45a049;\n}\n\n.message {\n    border-bottom: 1px solid #eee;\n    padding: 15px 0;\n}\n\n.message:last-child {\n    border-bottom: none;\n}\n\n.message p {\n    margin: 0 0 10px 0;\n    font-size: 16px;\n    line-height: 1.4;\n    color: #333;\n}\n\n.message-info {\n    display: flex;\n    justify-content: space-between;\n    align-items: center;\n    font-size: 14px;\n    color: #666;\n}\n\n.actions {\n    display: flex;\n    gap: 10px;\n}\n\n.like-btn, .delete-btn {\n    padding: 5px 10px;\n    border: none;\n    border-radius: 3px;\n    cursor: pointer;\n    font-size: 14px;\n    transition: background-color 0.3s;\n}\n\n.like-btn {\n    background-color: #e0e0e0;\n    color: #333;\n}\n\n.like-btn:hover {\n    background-color: #d0d0d0;\n}\n\n.delete-btn {\n    background-color: #ff6b6b;\n    color: white;\n}\n\n.delete-btn:hover {\n    background-color: #ff5252;\n}\n\np {\n    margin: 0;\n}\n\n@media (max-width: 600px) {\n    .container {\n        padding: 15px;\n    }\n    \n    .message-info {\n        flex-direction: column;\n        align-items: flex-start;\n        gap: 5px;\n    }\n    \n    .actions {\n        width: 100%;\n        justify-content: flex-start;\n    }\n}"
+    }
+  },
+  "history": [
+    {
+      "at": "2026-10-16T16:08:17Z",
+      "by": "user-kgw7z",
+      "kind": "create",
+      "model": "qwen3-coder:30b",
+      "request": "一個團隊留言板：可以發表、按讚和刪除留言，最新的在上面",
+      "summary": "建立一個團隊留言板，使用者可以發佈留言、對留言按讚以及刪除自己的留言，留言會依照時間順序顯示，最新的在最上面。"
+    }
+  ],
+  "plan": {
+    "appName": "demo-board",
+    "components": {
+      "api": {
+        "endpoints": [
+          {
+            "method": "GET",
+            "path": "/messages",
+            "purpose": "獲取所有留言列表，按時間順序排列，最新的在最上面"
+          },
+          {
+            "method": "POST",
+            "path": "/messages",
+            "purpose": "新增一則留言"
+          },
+          {
+            "method": "PUT",
+            "path": "/messages/{id}/like",
+            "purpose": "對指定留言進行按讚操作"
+          },
+          {
+            "method": "DELETE",
+            "path": "/messages/{id}",
+            "purpose": "刪除指定 ID 的留言"
+          }
+        ],
+        "modules": [
+          {
+            "name": "message_board.py",
+            "purpose": "實作留言功能的後端 API，處理留言的新增、讀取、更新和刪除"
+          }
+        ]
+      },
+      "web": {
+        "modules": [
+          {
+            "name": "index.html",
+            "purpose": "提供前端頁面結構，包含留言輸入表單和留言展示區"
+          },
+          {
+            "name": "app.js",
+            "purpose": "處理前端互動邏輯，包括新增、按讚和刪除留言的功能"
+          },
+          {
+            "name": "style.css",
+            "purpose": "定義前端頁面的樣式和排版"
+          }
+        ]
+      }
+    },
+    "notes": "此應用程式使用記憶體儲存資料，不包含永久儲存機制。所有留言資料在服務重啟後會遺失。前端使用原生 JavaScript 實作互動功能，不依賴外部框架。",
+    "steps": [
+      "設計前端頁面，包含留言輸入框、提交按鈕和留言列表展示區域",
+      "實作前端 JavaScript 程式碼，處理留言的新增、顯示和刪除功能",
+      "建立 API 模組，處理留言的儲存、讀取、更新（按讚）和刪除操作",
+      "設計 API 端點：獲取所有留言、新增留言、對留言按讚、刪除留言",
+      "實作後端 Python 程式碼，使用記憶體儲存留言資料",
+      "整合前端與後端 API，確保資料能正確傳遞和顯示",
+      "測試留言新增功能，確認留言能正確儲存並顯示在列表最上方",
+      "測試留言按讚功能，確認點擊按讚按鈕能更新留言的按讚數",
+      "測試留言刪除功能，確認使用者可以刪除自己的留言",
+      "驗證留言顯示順序，確保最新的留言顯示在最上面"
+    ],
+    "summary": "建立一個團隊留言板，使用者可以發佈留言、對留言按讚以及刪除自己的留言，留言會依照時間順序顯示，最新的在最上面。"
+  },
+  "schema": 1
+}
