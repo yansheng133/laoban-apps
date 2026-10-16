@@ -1,0 +1,91 @@
+{
+  "appName": "team-board",
+  "files": {
+    "api": {
+      "handler.py": "import time\nimport json\nfrom datetime import datetime\n\ndata = []\nnext_id = 1\n\ndef handle(method, path, body):\n    global data, next_id\n    \n    if path == '/messages':\n        if method == 'GET':\n            return (200, data)\n        elif method == 'POST':\n            try:\n                payload = json.loads(body.decode('utf-8'))\n                content = payload.get('content', '').strip()\n                if not content:\n                    return (400, {'error': '留言內容不能為空'})\n                \n                message = {\n                    'id': next_id,\n                    'content': content,\n                    'timestamp': datetime.now().isoformat(),\n                    'likes': 0\n                }\n                data.append(message)\n                next_id += 1\n                return (201, message)\n            except Exception as e:\n                return (400, {'error': '無效的請求數據'})\n        else:\n            return (405, {'error': '不支援的方法'})\n    \n    elif path.startswith('/messages/') and path.endswith('/like'):\n        # 處理按讚\n        parts = path.split('/')\n        if len(parts) == 4:  # /messages/{id}/like\n            try:\n                message_id = int(parts[2])\n                for msg in data:\n                    if msg['id'] == message_id:\n                        msg['likes'] += 1\n                        return (200, msg)\n                return (404, {'error': '留言不存在'})\n            except ValueError:\n                return (400, {'error': '無效的留言ID'})\n        else:\n            return (404, {'error': '找不到資源'})\n    \n    elif path.startswith('/messages/') and len(path.split('/')) == 3:\n        # 處理刪除\n        try:\n            message_id = int(path.split('/')[-1])\n            for i, msg in enumerate(data):\n                if msg['id'] == message_id:\n                    del data[i]\n                    return (200, {'message': '留言已刪除'})\n            return (404, {'error': '留言不存在'})\n        except ValueError:\n            return (400, {'error': '無效的留言ID'})\n    \n    else:\n        return (404, {'error': '找不到資源'})"
+    },
+    "web": {
+      "app.js": "document.addEventListener('DOMContentLoaded', () => {\n    const messageForm = document.getElementById('messageForm');\n    const messageInput = document.getElementById('messageInput');\n    const messagesContainer = document.getElementById('messagesContainer');\n\n    // 顯示留言列表\n    async function loadMessages() {\n        try {\n            const response = await fetch('api/messages');\n            const messages = await response.json();\n            displayMessages(messages);\n        } catch (error) {\n            console.error('載入留言失敗:', error);\n        }\n    }\n\n    // 顯示留言\n    function displayMessages(messages) {\n        messagesContainer.innerHTML = '';\n        \n        if (messages.length === 0) {\n            messagesContainer.innerHTML = '<p>目前沒有留言。</p>';\n            return;\n        }\n\n        // 按時間排序（最新的在前）\n        messages.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));\n        \n        messages.forEach(msg => {\n            const messageElement = document.createElement('div');\n            messageElement.className = 'message';\n            messageElement.innerHTML = `\n                <p>${msg.content}</p>\n                <div class=\"message-info\">\n                    <span>時間: ${new Date(msg.timestamp).toLocaleString('zh-TW')}</span>\n                    <span>按讚: ${msg.likes}</span>\n                    <button class=\"like-btn\" data-id=\"${msg.id}\">按讚</button>\n                    <button class=\"delete-btn\" data-id=\"${msg.id}\">刪除</button>\n                </div>\n            `;\n            messagesContainer.appendChild(messageElement);\n        });\n\n        // 綁定按讚和刪除按鈕事件\n        document.querySelectorAll('.like-btn').forEach(btn => {\n            btn.addEventListener('click', async (e) => {\n                const id = e.target.dataset.id;\n                await likeMessage(id);\n            });\n        });\n\n        document.querySelectorAll('.delete-btn').forEach(btn => {\n            btn.addEventListener('click', async (e) => {\n                const id = e.target.dataset.id;\n                await deleteMessage(id);\n            });\n        });\n    }\n\n    // 發表留言\n    messageForm.addEventListener('submit', async (e) => {\n        e.preventDefault();\n        \n        if (!messageInput.value.trim()) return;\n        \n        try {\n            const content = messageInput.value.trim();\n            await fetch('api/messages', {\n                method: 'POST',\n                headers: { 'Content-Type': 'application/json' },\n                body: JSON.stringify({ content })\n            });\n            \n            messageInput.value = '';\n            await loadMessages(); // 重新載入留言\n        } catch (error) {\n            console.error('發表留言失敗:', error);\n        }\n    });\n\n    // 按讚\n    async function likeMessage(id) {\n        try {\n            await fetch(`api/messages/${id}/like`, { method: 'PUT' });\n            await loadMessages(); // 重新載入留言\n        } catch (error) {\n            console.error('按讚失敗:', error);\n        }\n    }\n\n    // 刪除留言\n    async function deleteMessage(id) {\n        try {\n            if (!confirm('確定要刪除這則留言嗎？')) return;\n            \n            await fetch(`api/messages/${id}`, { method: 'DELETE' });\n            await loadMessages(); // 重新載入留言\n        } catch (error) {\n            console.error('刪除留言失敗:', error);\n        }\n    }\n\n    // 初始化載入留言\n    loadMessages();\n});",
+      "index.html": "<!DOCTYPE html>\n<html lang=\"zh-TW\">\n<head>\n    <meta charset=\"UTF-8\">\n    <title>團隊留言板</title>\n    <link rel=\"stylesheet\" href=\"style.css\">\n</head>\n<body>\n    <div class=\"container\">\n        <h1>團隊留言板</h1>\n        \n        <!-- 新增留言表單 -->\n        <form id=\"messageForm\">\n            <textarea id=\"messageInput\" placeholder=\"輸入您的留言...\" required></textarea>\n            <button type=\"submit\">發表留言</button>\n        </form>\n        \n        <!-- 留言列表 -->\n        <div id=\"messagesContainer\"></div>\n    </div>\n    \n    <script src=\"app.js\"></script>\n</body>\n</html>",
+      "style.css": "body {\n    font-family: 'Microsoft JhengHei', Arial, sans-serif;\n    background-color: #f5f5f5;\n    margin: 0;\n    padding: 0;\n}\n\n.container {\n    max-width: 800px;\n    margin: 0 auto;\n    padding: 20px;\n}\n\nh1 {\n    text-align: center;\n    color: #333;\n    margin-bottom: 30px;\n}\n\n#messageForm {\n    background-color: white;\n    padding: 20px;\n    border-radius: 8px;\n    box-shadow: 0 2px 4px rgba(0,0,0,0.1);\n    margin-bottom: 30px;\n}\n\n#messageInput {\n    width: 100%;\n    height: 100px;\n    padding: 10px;\n    border: 1px solid #ddd;\n    border-radius: 4px;\n    resize: vertical;\n    font-size: 16px;\n    box-sizing: border-box;\n}\n\nbutton {\n    background-color: #007bff;\n    color: white;\n    border: none;\n    padding: 10px 20px;\n    border-radius: 4px;\n    cursor: pointer;\n    font-size: 16px;\n    margin-top: 10px;\n}\n\nbutton:hover {\n    background-color: #0056b3;\n}\n\n.message {\n    background-color: white;\n    padding: 20px;\n    border-radius: 8px;\n    box-shadow: 0 2px 4px rgba(0,0,0,0.1);\n    margin-bottom: 15px;\n}\n\n.message p {\n    margin: 0 0 10px 0;\n    font-size: 16px;\n    line-height: 1.5;\n}\n\n.message-info {\n    display: flex;\n    justify-content: space-between;\n    align-items: center;\n    flex-wrap: wrap;\n    gap: 10px;\n    font-size: 14px;\n    color: #666;\n}\n\n.message-info span {\n    margin-right: 15px;\n}\n\n.like-btn, .delete-btn {\n    background-color: #28a745;\n    padding: 5px 10px;\n    font-size: 14px;\n}\n\n.delete-btn {\n    background-color: #dc3545;\n}\n\n.like-btn:hover, .delete-btn:hover {\n    opacity: 0.8;\n}\n\n@media (max-width: 600px) {\n    .message-info {\n        flex-direction: column;\n        align-items: flex-start;\n    }\n    \n    .message-info span {\n        margin-right: 0;\n        margin-bottom: 5px;\n    }\n}"
+    }
+  },
+  "history": [
+    {
+      "at": "2026-10-16T16:18:17Z",
+      "by": "user-kgw7z",
+      "kind": "create",
+      "model": "qwen3-coder:30b",
+      "request": "一個團隊留言板：可以發表、按讚和刪除留言，最新的在上面",
+      "summary": "一個團隊留言板應用程式，允許使用者發表、按讚和刪除留言，並以最新的留言顯示在上方。"
+    }
+  ],
+  "plan": {
+    "appName": "team-board",
+    "components": {
+      "api": {
+        "endpoints": [
+          {
+            "method": "GET",
+            "path": "/messages",
+            "purpose": "取得所有留言列表，按時間排序"
+          },
+          {
+            "method": "POST",
+            "path": "/messages",
+            "purpose": "新增一筆留言"
+          },
+          {
+            "method": "PUT",
+            "path": "/messages/{id}/like",
+            "purpose": "為指定留言增加按讚數"
+          },
+          {
+            "method": "DELETE",
+            "path": "/messages/{id}",
+            "purpose": "刪除指定的留言"
+          }
+        ],
+        "modules": [
+          {
+            "name": "board_api.py",
+            "purpose": "處理所有留言相關的HTTP請求與資料操作"
+          }
+        ]
+      },
+      "web": {
+        "modules": [
+          {
+            "name": "index.html",
+            "purpose": "主頁面結構與留言展示區域"
+          },
+          {
+            "name": "app.js",
+            "purpose": "處理前端互動、API請求與畫面更新"
+          },
+          {
+            "name": "style.css",
+            "purpose": "定義網頁樣式與版面配置"
+          }
+        ]
+      }
+    },
+    "notes": "此應用程式使用記憶體儲存資料，不包含永續性儲存。所有API請求都透過標準庫實作，無需額外依賴。前端使用JavaScript與後端API互動，實現即時更新功能。",
+    "steps": [
+      "建立前端靜態網頁結構與樣式",
+      "實作前端JavaScript互動功能",
+      "設計後端API架構與資料模型",
+      "實作後端Python API模組",
+      "設定API路由與HTTP方法處理",
+      "實作留言發表功能",
+      "實作留言按讚功能",
+      "實作留言刪除功能",
+      "整合前端與後端API",
+      "測試所有功能是否正常運作",
+      "調整UI/UX以提升使用者體驗",
+      "部署應用程式到Rancher Kubernetes集群"
+    ],
+    "summary": "一個團隊留言板應用程式，允許使用者發表、按讚和刪除留言，並以最新的留言顯示在上方。"
+  },
+  "schema": 1
+}
