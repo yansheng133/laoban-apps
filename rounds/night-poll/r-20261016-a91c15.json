@@ -1,0 +1,78 @@
+{
+  "app": "night-poll",
+  "archivedAt": "2026-10-16T08:10:22Z",
+  "round": {
+    "app": "night-poll",
+    "confirmers": [],
+    "deadline": 1792138762,
+    "id": "r-20261016-a91c15",
+    "initiator": "laoban-cli-test",
+    "log": [
+      {
+        "args": {
+          "minutes": "10"
+        },
+        "at": "2026-10-16T08:09:22Z",
+        "by": "laoban-cli-test",
+        "code": "opened",
+        "event": "開始一輪（10 分鐘後收斂）"
+      },
+      {
+        "args": {
+          "opinion": "o1"
+        },
+        "at": "2026-10-16T08:09:48Z",
+        "by": "user-kgw7z",
+        "code": "supported",
+        "event": "附議意見 o1"
+      },
+      {
+        "args": {
+          "opinion": "o1"
+        },
+        "at": "2026-10-16T08:10:02Z",
+        "by": "user-kgw7z",
+        "code": "replied",
+        "event": "回覆意見 o1"
+      },
+      {
+        "at": "2026-10-16T08:10:13Z",
+        "by": "laoban-cli-test",
+        "code": "cancelled",
+        "event": "取消這一輪"
+      }
+    ],
+    "message": "",
+    "opinions": [
+      {
+        "at": "2026-10-16T08:09:22Z",
+        "by": "laoban-cli-test",
+        "id": "o1",
+        "replies": [
+          {
+            "at": "2026-10-16T08:10:02Z",
+            "by": "user-kgw7z",
+            "text": "t20-A18 reply: agree"
+          }
+        ],
+        "supporters": [
+          "user-kgw7z"
+        ],
+        "target": {
+          "id": "mod-web-vote-form-html",
+          "name": "vote-form.html"
+        },
+        "text": "t20-A18：投票按鈕再大一點"
+      }
+    ],
+    "plan": null,
+    "result": null,
+    "scope": [
+      "web",
+      "api"
+    ],
+    "state": "cancelled"
+  },
+  "schema": 1,
+  "targetNamespace": "laoban-dev"
+}
