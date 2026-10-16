@@ -1,0 +1,48 @@
+{
+  "app": "todo",
+  "archivedAt": "2026-10-16T08:47:34Z",
+  "round": {
+    "app": "todo",
+    "confirmers": [],
+    "deadline": 1792141040,
+    "id": "r-20261016-6db255",
+    "initiator": "laoban-cli-test",
+    "log": [
+      {
+        "args": {
+          "minutes": "10"
+        },
+        "at": "2026-10-16T08:47:20Z",
+        "by": "laoban-cli-test",
+        "code": "opened",
+        "event": "開始一輪（10 分鐘後收斂）"
+      },
+      {
+        "at": "2026-10-16T08:47:27Z",
+        "by": "laoban-cli-test",
+        "code": "cancelled",
+        "event": "取消這一輪"
+      }
+    ],
+    "message": "",
+    "opinions": [
+      {
+        "at": "2026-10-16T08:47:20Z",
+        "by": "laoban-cli-test",
+        "id": "o1",
+        "replies": [],
+        "supporters": [],
+        "text": "t20-C13 聯絡人 [MASKED:TW_ID] 要能查"
+      }
+    ],
+    "plan": null,
+    "result": null,
+    "scope": [
+      "web",
+      "api"
+    ],
+    "state": "cancelled"
+  },
+  "schema": 1,
+  "targetNamespace": "laoban-dev"
+}
