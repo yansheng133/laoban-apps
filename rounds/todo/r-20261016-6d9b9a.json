@@ -1,0 +1,68 @@
+{
+  "app": "todo",
+  "archivedAt": "2026-10-16T12:57:43Z",
+  "openedAt": "2026-10-16T12:56:38Z",
+  "round": {
+    "app": "todo",
+    "confirmers": [],
+    "deadline": 1792155459,
+    "id": "r-20261016-6d9b9a",
+    "initiator": "laoban-cli-test",
+    "log": [
+      {
+        "args": {
+          "minutes": "10"
+        },
+        "at": "2026-10-16T12:56:38Z",
+        "by": "laoban-cli-test",
+        "code": "opened",
+        "event": "開始一輪（10 分鐘後收斂）"
+      },
+      {
+        "args": {
+          "opinion": "o1"
+        },
+        "at": "2026-10-16T12:56:39Z",
+        "by": "laoban-cli-test",
+        "code": "withdrawn",
+        "event": "撤回意見 o1"
+      },
+      {
+        "args": {
+          "minutes": "1"
+        },
+        "at": "2026-10-16T12:56:39Z",
+        "by": "laoban-cli-test",
+        "code": "deadline",
+        "event": "截止時間改成 1 分鐘後"
+      },
+      {
+        "at": "2026-10-16T12:57:43Z",
+        "by": "laoban",
+        "code": "emptyCancelled",
+        "event": "所有意見都撤回了，這一輪自動取消"
+      }
+    ],
+    "message": "",
+    "opinions": [
+      {
+        "at": "2026-10-16T12:56:38Z",
+        "by": "laoban-cli-test",
+        "id": "o1",
+        "replies": [],
+        "supporters": [],
+        "text": "",
+        "withdrawn": true
+      }
+    ],
+    "plan": null,
+    "result": null,
+    "scope": [
+      "web",
+      "api"
+    ],
+    "state": "cancelled"
+  },
+  "schema": 1,
+  "targetNamespace": "laoban-dev"
+}
