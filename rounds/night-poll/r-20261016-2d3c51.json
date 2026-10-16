@@ -1,0 +1,77 @@
+{
+  "app": "night-poll",
+  "archivedAt": "2026-10-16T08:55:52Z",
+  "round": {
+    "app": "night-poll",
+    "confirmers": [],
+    "deadline": 1792141490,
+    "id": "r-20261016-2d3c51",
+    "initiator": "laoban-cli-test",
+    "log": [
+      {
+        "args": {
+          "minutes": "10"
+        },
+        "at": "2026-10-16T08:54:50Z",
+        "by": "laoban-cli-test",
+        "code": "opened",
+        "event": "開始一輪（10 分鐘後收斂）"
+      },
+      {
+        "args": {
+          "count": "1"
+        },
+        "at": "2026-10-16T08:55:18Z",
+        "by": "user-kgw7z",
+        "code": "opinion",
+        "event": "提出 1 則意見"
+      },
+      {
+        "at": "2026-10-16T08:55:48Z",
+        "by": "laoban-cli-test",
+        "code": "cancelled",
+        "event": "取消這一輪"
+      }
+    ],
+    "message": "",
+    "opinions": [
+      {
+        "at": "2026-10-16T08:54:50Z",
+        "by": "laoban-cli-test",
+        "id": "o1",
+        "replies": [],
+        "supporters": [],
+        "text": "t20-C27marker 聯絡人 [MASKED:TW_ID] 要能查"
+      },
+      {
+        "at": "2026-10-16T08:54:50Z",
+        "by": "laoban-cli-test",
+        "id": "o2",
+        "replies": [],
+        "supporters": [],
+        "target": {
+          "id": "mod-web-vote-form-html",
+          "name": "vote-form.html"
+        },
+        "text": "t20-C28 刪除前的意見"
+      },
+      {
+        "at": "2026-10-16T08:55:18Z",
+        "by": "user-kgw7z",
+        "id": "o3",
+        "replies": [],
+        "supporters": [],
+        "text": "t20-C28 刪除後在頁面提的意見"
+      }
+    ],
+    "plan": null,
+    "result": null,
+    "scope": [
+      "web",
+      "api"
+    ],
+    "state": "cancelled"
+  },
+  "schema": 1,
+  "targetNamespace": "laoban-dev"
+}
