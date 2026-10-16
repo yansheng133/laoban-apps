@@ -1,0 +1,500 @@
+{
+  "app": "night-poll",
+  "archivedAt": "2026-10-16T15:39:01Z",
+  "openedAt": "2026-10-16T15:32:54Z",
+  "round": {
+    "app": "night-poll",
+    "confirmers": [
+      {
+        "answer": "confirmed",
+        "at": "2026-10-16T15:36:36Z",
+        "user": "user-kgw7z"
+      },
+      {
+        "answer": "confirmed",
+        "at": "2026-10-16T15:36:25Z",
+        "user": "laoban-cli-test"
+      }
+    ],
+    "deadline": 1792164885,
+    "id": "r-20261016-0daa6d",
+    "initiator": "user-kgw7z",
+    "log": [
+      {
+        "args": {
+          "minutes": "10"
+        },
+        "at": "2026-10-16T15:32:54Z",
+        "by": "user-kgw7z",
+        "code": "opened",
+        "event": "開始一輪（10 分鐘後收斂）"
+      },
+      {
+        "args": {
+          "count": "1"
+        },
+        "at": "2026-10-16T15:33:04Z",
+        "by": "laoban-cli-test",
+        "code": "opinion",
+        "event": "提出 1 則意見"
+      },
+      {
+        "args": {
+          "count": "1"
+        },
+        "at": "2026-10-16T15:33:31Z",
+        "by": "laoban-cli-test",
+        "code": "opinion",
+        "event": "提出 1 則意見"
+      },
+      {
+        "args": {
+          "count": "1"
+        },
+        "at": "2026-10-16T15:33:31Z",
+        "by": "laoban-cli-test",
+        "code": "opinion",
+        "event": "提出 1 則意見"
+      },
+      {
+        "args": {
+          "opinion": "o4"
+        },
+        "at": "2026-10-16T15:33:35Z",
+        "by": "laoban-cli-test",
+        "code": "withdrawn",
+        "event": "撤回意見 o4"
+      },
+      {
+        "args": {
+          "minutes": "30"
+        },
+        "at": "2026-10-16T15:34:08Z",
+        "by": "user-kgw7z",
+        "code": "deadline",
+        "event": "截止時間改成 30 分鐘後"
+      },
+      {
+        "args": {
+          "minutes": "1438"
+        },
+        "at": "2026-10-16T15:34:25Z",
+        "by": "user-kgw7z",
+        "code": "deadline",
+        "event": "截止時間改成 1438 分鐘後"
+      },
+      {
+        "args": {
+          "minutes": "0"
+        },
+        "at": "2026-10-16T15:34:45Z",
+        "by": "user-kgw7z",
+        "code": "deadline",
+        "event": "改成立即收斂"
+      },
+      {
+        "args": {
+          "count": "3"
+        },
+        "at": "2026-10-16T15:34:45Z",
+        "by": "laoban",
+        "code": "converging",
+        "event": "AI 開始收斂 3 則意見"
+      },
+      {
+        "at": "2026-10-16T15:35:09Z",
+        "by": "laoban",
+        "code": "converged",
+        "event": "修改計畫已產生，等待確認"
+      },
+      {
+        "args": {
+          "step": "1"
+        },
+        "at": "2026-10-16T15:35:19Z",
+        "by": "laoban-cli-test2",
+        "code": "commented",
+        "event": "對計畫第 1 步留言"
+      },
+      {
+        "args": {
+          "step": "2"
+        },
+        "at": "2026-10-16T15:35:56Z",
+        "by": "user-kgw7z",
+        "code": "commented",
+        "event": "對計畫第 2 步留言"
+      },
+      {
+        "at": "2026-10-16T15:36:25Z",
+        "by": "laoban-cli-test",
+        "code": "confirmed",
+        "event": "確認"
+      },
+      {
+        "at": "2026-10-16T15:36:36Z",
+        "by": "user-kgw7z",
+        "code": "confirmed",
+        "event": "確認"
+      },
+      {
+        "at": "2026-10-16T15:36:36Z",
+        "by": "laoban",
+        "code": "applying",
+        "event": "全部確認，AI 開始修改程式"
+      },
+      {
+        "at": "2026-10-16T15:38:58Z",
+        "by": "laoban",
+        "code": "done",
+        "event": "新版本已寫入 GitHub，等待 Fleet 部署"
+      }
+    ],
+    "message": "",
+    "opinions": [
+      {
+        "at": "2026-10-16T15:32:54Z",
+        "by": "user-kgw7z",
+        "id": "o1",
+        "replies": [],
+        "supporters": [],
+        "text": "t22-A3 Sam：投票選項旁顯示目前票數"
+      },
+      {
+        "at": "2026-10-16T15:33:04Z",
+        "by": "laoban-cli-test",
+        "id": "o2",
+        "replies": [],
+        "supporters": [],
+        "text": "第一行\n第二行\n第三行"
+      },
+      {
+        "at": "2026-10-16T15:33:31Z",
+        "by": "laoban-cli-test",
+        "id": "o3",
+        "replies": [],
+        "supporters": [],
+        "text": "t22-A6 A 意見甲：結果條圖加上百分比"
+      },
+      {
+        "at": "2026-10-16T15:33:31Z",
+        "by": "laoban-cli-test",
+        "id": "o4",
+        "replies": [],
+        "supporters": [],
+        "text": "",
+        "withdrawn": true
+      }
+    ],
+    "plan": {
+      "architecture": {
+        "edges": [
+          {
+            "from": "svc-web",
+            "kind": "routes",
+            "to": "app-web"
+          },
+          {
+            "from": "app-web",
+            "kind": "calls",
+            "label": "HTTP api/*",
+            "to": "svc-api"
+          },
+          {
+            "from": "svc-api",
+            "kind": "routes",
+            "to": "app-api"
+          },
+          {
+            "from": "app-api",
+            "kind": "writes",
+            "label": "memory",
+            "to": "tbl-data"
+          }
+        ],
+        "nodes": [
+          {
+            "detail": 2,
+            "id": "svc-web",
+            "kind": "service",
+            "layer": "network",
+            "name": "night-poll-web",
+            "parent": "app-web",
+            "pos": {
+              "x": -3.0,
+              "z": -2.0
+            },
+            "props": {
+              "port": 8080,
+              "type": "ClusterIP"
+            }
+          },
+          {
+            "detail": 2,
+            "id": "svc-api",
+            "kind": "service",
+            "layer": "network",
+            "name": "night-poll-api",
+            "parent": "app-api",
+            "pos": {
+              "x": 3.0,
+              "z": -2.0
+            },
+            "props": {
+              "port": 8080,
+              "type": "ClusterIP"
+            }
+          },
+          {
+            "detail": 1,
+            "id": "app-web",
+            "kind": "app",
+            "layer": "code",
+            "name": "night-poll-web",
+            "pos": {
+              "x": -3.0,
+              "z": 0.0
+            },
+            "props": {
+              "lang": "HTML/JavaScript",
+              "replicas": 1
+            }
+          },
+          {
+            "detail": 1,
+            "id": "app-api",
+            "kind": "app",
+            "layer": "code",
+            "name": "night-poll-api",
+            "pos": {
+              "x": 3.0,
+              "z": 0.0
+            },
+            "props": {
+              "endpoints": 8,
+              "lang": "Python",
+              "replicas": 1,
+              "routes": "DELETE /polls/{id}, GET /polls, GET /polls/{id}, GET /polls/{id}/results, GET /stats, POST /polls, POST /polls/{id}/vote, PUT /polls/{id}"
+            }
+          },
+          {
+            "detail": 3,
+            "id": "mod-web-index-html",
+            "kind": "module",
+            "layer": "code",
+            "name": "index.html",
+            "parent": "app-web",
+            "pos": {
+              "x": -5.25,
+              "z": 2.5
+            },
+            "props": {
+              "purpose": "主頁面，包含建立投票表單與結果顯示區域"
+            }
+          },
+          {
+            "detail": 3,
+            "id": "mod-web-app-js",
+            "kind": "module",
+            "layer": "code",
+            "name": "app.js",
+            "parent": "app-web",
+            "pos": {
+              "x": -3.75,
+              "z": 2.5
+            },
+            "props": {
+              "purpose": "處理前端互動邏輯，包括表單提交與API請求"
+            }
+          },
+          {
+            "detail": 3,
+            "id": "mod-web-style-css",
+            "kind": "module",
+            "layer": "code",
+            "name": "style.css",
+            "parent": "app-web",
+            "pos": {
+              "x": -2.25,
+              "z": 2.5
+            },
+            "props": {
+              "purpose": "定義網頁樣式，包括長條圖與表單美觀設計"
+            }
+          },
+          {
+            "detail": 3,
+            "id": "mod-web-vote-form-html",
+            "kind": "module",
+            "layer": "code",
+            "name": "vote-form.html",
+            "parent": "app-web",
+            "pos": {
+              "x": -0.75,
+              "z": 2.5
+            },
+            "props": {
+              "purpose": "投票建立表單頁面"
+            }
+          },
+          {
+            "detail": 3,
+            "id": "mod-web-vote-result-html",
+            "kind": "module",
+            "layer": "code",
+            "name": "vote-result.html",
+            "parent": "app-web",
+            "pos": {
+              "x": -5.25,
+              "z": 4.0
+            },
+            "props": {
+              "purpose": "顯示投票結果的頁面，包含總票數、百分比及截止倒數"
+            }
+          },
+          {
+            "detail": 3,
+            "id": "mod-web-chart-js",
+            "kind": "module",
+            "layer": "code",
+            "name": "chart.js",
+            "parent": "app-web",
+            "pos": {
+              "x": -3.75,
+              "z": 4.0
+            },
+            "props": {
+              "purpose": "處理長條圖繪製邏輯"
+            }
+          },
+          {
+            "detail": 3,
+            "id": "mod-web-api-client-js",
+            "kind": "module",
+            "layer": "code",
+            "name": "api-client.js",
+            "parent": "app-web",
+            "pos": {
+              "x": -2.25,
+              "z": 4.0
+            },
+            "props": {
+              "purpose": "前端API請求封裝模組"
+            }
+          },
+          {
+            "detail": 3,
+            "id": "mod-web-utils-js",
+            "kind": "module",
+            "layer": "code",
+            "name": "utils.js",
+            "parent": "app-web",
+            "pos": {
+              "x": -0.75,
+              "z": 4.0
+            },
+            "props": {
+              "purpose": "通用工具函數，如資料格式化"
+            }
+          },
+          {
+            "detail": 3,
+            "id": "mod-api-vote-api-py",
+            "kind": "module",
+            "layer": "code",
+            "name": "vote_api.py",
+            "parent": "app-api",
+            "pos": {
+              "x": 3.0,
+              "z": 2.5
+            },
+            "props": {
+              "purpose": "處理所有投票相關的HTTP請求與邏輯"
+            }
+          },
+          {
+            "detail": 2,
+            "id": "tbl-data",
+            "kind": "table",
+            "layer": "data",
+            "name": "night-poll-data",
+            "parent": "app-api",
+            "pos": {
+              "x": 3.0,
+              "z": 0.0
+            },
+            "props": {
+              "storage": "memory"
+            }
+          }
+        ]
+      },
+      "notes": "根據意見調整：#1「顯示目前票數」已實現於結果頁面；#3「結果條圖加上百分比」已加入。意見 #2 因為格式不明確未被採用。",
+      "planId": "p-20261016-a41e16",
+      "steps": [
+        "修改vote-api.py中的/get/polls/{id}/results端點，回傳結果時包含每個選項的票數",
+        "更新vote-result.html中的結果顯示邏輯，加入各選項的票數與百分比計算",
+        "調整chart.js模組以支援顯示百分比文字於長條圖上",
+        "確認所有其他元件保持不變",
+        "測試前端UI是否正確顯示新的票數與百分比資訊",
+        "整合所有變更並進行測試",
+        "部署更新後的應用程式至Rancher Kubernetes叢集"
+      ],
+      "summary": "一個簡易投票工具，允許使用者建立投票題目與選項，進行投票並即時查看結果長條圖。系統限制每個人只能投一次票。應用程式標題已更新為「夜間投票」。新增投票截止時間功能、改善前端UI與結果顯示，並增加總票數顯示與百分比計算。根據意見調整，新增頁尾並改善按鈕樣式與結果頁字體大小。現於投票選項旁顯示目前票數，並在結果條圖中加入百分比顯示。"
+    },
+    "planComments": [
+      {
+        "at": "2026-10-16T15:35:19Z",
+        "by": "laoban-cli-test2",
+        "id": "c1",
+        "step": 1,
+        "stepText": "修改vote-api.py中的/get/polls/{id}/results端點，回傳結果時包含每個選項的票數",
+        "supporters": [],
+        "text": "t22-A7 B：第 1 步請保留原本的配色"
+      },
+      {
+        "at": "2026-10-16T15:35:56Z",
+        "by": "user-kgw7z",
+        "id": "c2",
+        "step": 2,
+        "stepText": "更新vote-result.html中的結果顯示邏輯，加入各選項的票數與百分比計算",
+        "supporters": [
+          "laoban-cli-test2"
+        ],
+        "text": "t22-A7 Sam：第 2 步百分比取到小數點後一位"
+      }
+    ],
+    "result": {
+      "appName": "night-poll",
+      "appUrl": "/k8s/clusters/c-m-26kbxk5f/api/v1/namespaces/laoban-dev/services/http:night-poll-web:8080/proxy/",
+      "commit": "36503c543ca143a9e721c6146b3c0362f501fa12",
+      "commitUrl": "https://github.com/yansheng133/laoban-apps/commit/36503c543ca143a9e721c6146b3c0362f501fa12",
+      "fleet": {
+        "bundlePrefix": "laoban-apps-apps-night-poll",
+        "gitRepo": "laoban-apps",
+        "workspace": "fleet-default"
+      },
+      "mode": "edit",
+      "path": "apps/night-poll",
+      "rollout": [
+        {
+          "contentHash": "efca1a7eebaee6c2af8fd42b34cc0a30bd63a2efdef67cb3319044dcda09cafa",
+          "deployment": "night-poll-web",
+          "path": "/k8s/clusters/c-m-26kbxk5f/v1/apps.deployments/laoban-dev/night-poll-web"
+        },
+        {
+          "contentHash": "ff153427657c0826a4ea5430853326f73073a09f2772ec65aa0450dff6210da8",
+          "deployment": "night-poll-api",
+          "path": "/k8s/clusters/c-m-26kbxk5f/v1/apps.deployments/laoban-dev/night-poll-api"
+        }
+      ]
+    },
+    "scope": [
+      "web",
+      "api"
+    ],
+    "state": "done"
+  },
+  "schema": 1,
+  "targetNamespace": "laoban-dev"
+}
