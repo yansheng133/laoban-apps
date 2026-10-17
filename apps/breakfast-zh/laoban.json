@@ -1,0 +1,103 @@
+{
+  "appName": "breakfast-zh",
+  "files": {
+    "api": {
+      "handler.py": "from datetime import datetime\nimport json\n\nMENU = [\n    {'id': 'egg-pancake', 'name': '蛋餅', 'price': 35},\n    {'id': 'turnip-cake', 'name': '蘿蔔糕', 'price': 40},\n    {'id': 'iron-noodles', 'name': '鐵板麵', 'price': 55},\n    {'id': 'chicken-nuggets', 'name': '雞塊', 'price': 45},\n    {'id': 'milk-tea', 'name': '奶茶', 'price': 30},\n    {'id': 'soy-milk', 'name': '豆漿', 'price': 25},\n]\nMENU_BY_ID = {m['id']: m for m in MENU}\n\nSTATUS_TODO = '待做'\nSTATUS_DOING = '製作中'\nSTATUS_DONE = '完成'\nNEXT_STATUS = {STATUS_TODO: STATUS_DOING, STATUS_DOING: STATUS_DONE}\n\nORDERS = []\nNEXT_ID = 1\n\n\ndef _parse_body(body):\n    if not body:\n        return None\n    try:\n        return json.loads(body.decode('utf-8'))\n    except (UnicodeDecodeError, ValueError):\n        return None\n\n\ndef _create_order(data):\n    global NEXT_ID\n    if not isinstance(data, dict):\n        return 400, {'error': '請求內容必須是 JSON 物件'}\n    table = data.get('table')\n    if not isinstance(table, str) or not table.strip():\n        return 400, {'error': '桌號不可為空'}\n    raw_items = data.get('items')\n    if not isinstance(raw_items, list):\n        return 400, {'error': '品項格式錯誤'}\n\n    lines = []\n    total = 0\n    for entry in raw_items:\n        if not isinstance(entry, dict):\n            return 400, {'error': '品項格式錯誤'}\n        item_id = entry.get('id')\n        qty = entry.get('qty')\n        if not isinstance(item_id, str) or item_id not in MENU_BY_ID:\n            return 400, {'error': '未知的餐點'}\n        if isinstance(qty, bool) or not isinstance(qty, int) or qty < 0:\n            return 400, {'error': '數量必須為非負整數'}\n        if qty == 0:\n            continue\n        m = MENU_BY_ID[item_id]\n        subtotal = m['price'] * qty\n        total += subtotal\n        lines.append({\n            'id': m['id'],\n            'name': m['name'],\n            'price': m['price'],\n            'qty': qty,\n            'subtotal': subtotal,\n        })\n    if not lines:\n        return 400, {'error': '請至少選擇一項餐點'}\n\n    now = datetime.now().astimezone()\n    order = {\n        'id': NEXT_ID,\n        'table': table.strip(),\n        'items': lines,\n        'total': total,\n        'status': STATUS_TODO,\n        'created_at': now.isoformat(timespec='seconds'),\n        'date': now.date().isoformat(),\n    }\n    ORDERS.append(order)\n    NEXT_ID += 1\n    return 201, {'order': order}\n\n\ndef _update_status(order_id, data):\n    if not isinstance(data, dict):\n        return 400, {'error': '請求內容必須是 JSON 物件'}\n    new_status = data.get('status')\n    if new_status not in (STATUS_DOING, STATUS_DONE):\n        return 400, {'error': '狀態值不正確'}\n    order = None\n    for o in ORDERS:\n        if o['id'] == order_id:\n            order = o\n            break\n    if order is None:\n        return 404, {'error': '找不到訂單'}\n    if NEXT_STATUS.get(order['status']) != new_status:\n        return 409, {'error': '不允許的狀態轉換'}\n    order['status'] = new_status\n    return 200, {'order': order}\n\n\ndef _sales_today():\n    today = datetime.now().astimezone().date().isoformat()\n    count = 0\n    total = 0\n    for o in ORDERS:\n        if o['date'] == today:\n            count += 1\n            total += o['total']\n    return 200, {'date': today, 'count': count, 'total': total}\n\n\ndef handle(method: str, path: str, body: bytes) -> tuple[int, dict]:\n    method = method.upper()\n    parts = [p for p in path.split('/') if p]\n\n    if parts == ['menu']:\n        if method != 'GET':\n            return 405, {'error': '方法不允許'}\n        return 200, {'items': [dict(m) for m in MENU]}\n\n    if parts == ['orders']:\n        if method == 'GET':\n            orders = sorted(ORDERS, key=lambda o: (o['created_at'], o['id']))\n            return 200, {'orders': orders}\n        if method == 'POST':\n            data = _parse_body(body)\n            if data is None:\n                return 400, {'error': 'JSON 格式錯誤'}\n            return _create_order(data)\n        return 405, {'error': '方法不允許'}\n\n    if len(parts) == 3 and parts[0] == 'orders' and parts[2] == 'status':\n        if method != 'PATCH':\n            return 405, {'error': '方法不允許'}\n        if not (parts[1].isascii() and parts[1].isdigit()):\n            return 404, {'error': '找不到訂單'}\n        data = _parse_body(body)\n        if data is None:\n            return 400, {'error': 'JSON 格式錯誤'}\n        return _update_status(int(parts[1]), data)\n\n    if parts == ['sales', 'today']:\n        if method != 'GET':\n            return 405, {'error': '方法不允許'}\n        return _sales_today()\n\n    return 404, {'error': '找不到端點'}\n"
+    },
+    "web": {
+      "app.js": "const STATUS_CLASS = { '待做': 'status-todo', '製作中': 'status-doing', '完成': 'status-done' };\nconst NEXT_STATUS = { '待做': '製作中', '製作中': '完成' };\nconst NEXT_LABEL = { '待做': '開始製作', '製作中': '標示完成' };\nlet menu = [];\nconst cart = {};\n\nfunction el(tag, className, text) {\n  const node = document.createElement(tag);\n  if (className) node.className = className;\n  if (text !== undefined) node.textContent = text;\n  return node;\n}\n\nasync function api(path, options) {\n  let res;\n  try {\n    res = await fetch(path, options);\n  } catch (err) {\n    throw new Error('網路連線失敗，請稍後再試');\n  }\n  let data = null;\n  try {\n    data = await res.json();\n  } catch (err) {\n    data = null;\n  }\n  if (!res.ok) {\n    throw new Error((data && data.error) || ('請求失敗（' + res.status + '）'));\n  }\n  return data;\n}\n\nfunction showMessage(id, text, isError) {\n  const node = document.getElementById(id);\n  node.textContent = text;\n  node.className = isError ? 'message error' : 'message ok';\n}\n\nfunction cartTotal() {\n  return menu.reduce((sum, m) => sum + m.price * (cart[m.id] || 0), 0);\n}\n\nfunction renderMenu() {\n  const container = document.getElementById('menu');\n  container.textContent = '';\n  for (const m of menu) {\n    const row = el('div', 'menu-row');\n    row.appendChild(el('span', 'dish-name', m.name));\n    row.appendChild(el('span', 'dish-price', m.price + ' 元'));\n    const controls = el('div', 'qty-controls');\n    const minus = el('button', '', '−');\n    minus.type = 'button';\n    minus.setAttribute('aria-label', m.name + ' 減少');\n    minus.addEventListener('click', () => changeQty(m.id, -1));\n    const qty = el('span', 'qty', String(cart[m.id] || 0));\n    qty.id = 'qty-' + m.id;\n    const plus = el('button', '', '+');\n    plus.type = 'button';\n    plus.setAttribute('aria-label', m.name + ' 增加');\n    plus.addEventListener('click', () => changeQty(m.id, 1));\n    controls.appendChild(minus);\n    controls.appendChild(qty);\n    controls.appendChild(plus);\n    row.appendChild(controls);\n    container.appendChild(row);\n  }\n  document.getElementById('cart-total').textContent = String(cartTotal());\n}\n\nfunction changeQty(id, delta) {\n  cart[id] = Math.max(0, (cart[id] || 0) + delta);\n  document.getElementById('qty-' + id).textContent = String(cart[id]);\n  document.getElementById('cart-total').textContent = String(cartTotal());\n}\n\nasync function loadMenu() {\n  try {\n    const data = await api('api/menu');\n    menu = data.items;\n    renderMenu();\n  } catch (err) {\n    showMessage('order-message', err.message, true);\n  }\n}\n\nasync function submitOrder() {\n  const table = document.getElementById('table-input').value.trim();\n  const items = menu\n    .filter((m) => (cart[m.id] || 0) > 0)\n    .map((m) => ({ id: m.id, qty: cart[m.id] }));\n  if (!table) {\n    showMessage('order-message', '請輸入桌號', true);\n    return;\n  }\n  if (items.length === 0) {\n    showMessage('order-message', '請至少選擇一項餐點', true);\n    return;\n  }\n  const btn = document.getElementById('submit-btn');\n  btn.disabled = true;\n  try {\n    const data = await api('api/orders', {\n      method: 'POST',\n      headers: { 'Content-Type': 'application/json' },\n      body: JSON.stringify({ table: table, items: items })\n    });\n    for (const m of menu) {\n      cart[m.id] = 0;\n    }\n    document.getElementById('table-input').value = '';\n    renderMenu();\n    showMessage('order-message', '訂單已送出，訂單編號 #' + data.order.id, false);\n  } catch (err) {\n    showMessage('order-message', err.message, true);\n  } finally {\n    btn.disabled = false;\n  }\n}\n\nasync function loadOrders() {\n  try {\n    const data = await api('api/orders');\n    renderOrders(data.orders);\n    showMessage('kitchen-message', '', false);\n  } catch (err) {\n    showMessage('kitchen-message', err.message, true);\n  }\n}\n\nfunction renderOrders(orders) {\n  const box = document.getElementById('orders');\n  box.textContent = '';\n  if (orders.length === 0) {\n    box.appendChild(el('p', 'empty', '目前沒有訂單'));\n    return;\n  }\n  for (const o of orders) {\n    const cls = STATUS_CLASS[o.status] || '';\n    const card = el('article', 'order-card ' + cls);\n    const head = el('div', 'order-head');\n    head.appendChild(el('strong', '', '#' + o.id + '　桌號 ' + o.table));\n    head.appendChild(el('span', 'badge ' + cls, o.status));\n    card.appendChild(head);\n    const list = el('ul', 'order-items');\n    for (const line of o.items) {\n      list.appendChild(el('li', '', line.name + ' × ' + line.qty + '（' + line.subtotal + ' 元）'));\n    }\n    card.appendChild(list);\n    card.appendChild(el('div', 'order-total', '合計 ' + o.total + ' 元　下單時間 ' + o.created_at.replace('T', ' ')));\n    const next = NEXT_STATUS[o.status];\n    if (next) {\n      const btn = el('button', 'primary', NEXT_LABEL[o.status]);\n      btn.type = 'button';\n      btn.addEventListener('click', () => changeStatus(o.id, next));\n      card.appendChild(btn);\n    }\n    box.appendChild(card);\n  }\n}\n\nasync function changeStatus(orderId, status) {\n  try {\n    await api('api/orders/' + orderId + '/status', {\n      method: 'PATCH',\n      headers: { 'Content-Type': 'application/json' },\n      body: JSON.stringify({ status: status })\n    });\n    await loadOrders();\n  } catch (err) {\n    showMessage('kitchen-message', err.message, true);\n  }\n}\n\nasync function loadSales() {\n  const box = document.getElementById('sales');\n  try {\n    const d = await api('api/sales/today');\n    box.textContent = '';\n    box.appendChild(el('p', '', '日期：' + d.date));\n    box.appendChild(el('p', '', '今日訂單數：' + d.count));\n    box.appendChild(el('p', 'sales-total', '今日營業額：' + d.total + ' 元'));\n  } catch (err) {\n    box.textContent = '';\n    box.appendChild(el('p', 'message error', err.message));\n  }\n}\n\nfunction showTab(name) {\n  for (const btn of document.querySelectorAll('.tab')) {\n    btn.classList.toggle('active', btn.dataset.tab === name);\n  }\n  for (const sec of document.querySelectorAll('.panel')) {\n    sec.classList.toggle('hidden', sec.id !== 'tab-' + name);\n  }\n  if (name === 'kitchen') loadOrders();\n  if (name === 'sales') loadSales();\n}\n\nfunction init() {\n  for (const btn of document.querySelectorAll('.tab')) {\n    btn.addEventListener('click', () => showTab(btn.dataset.tab));\n  }\n  document.getElementById('submit-btn').addEventListener('click', submitOrder);\n  document.getElementById('refresh-kitchen').addEventListener('click', loadOrders);\n  document.getElementById('refresh-sales').addEventListener('click', loadSales);\n  loadMenu();\n}\n\ninit();\n",
+      "index.html": "<!DOCTYPE html>\n<html lang='zh-Hant'>\n<head>\n<meta charset='UTF-8'>\n<meta name='viewport' content='width=device-width, initial-scale=1'>\n<title>早餐店點餐系統</title>\n<link rel='stylesheet' href='style.css'>\n</head>\n<body>\n<header>\n<h1>早餐店點餐系統</h1>\n</header>\n<nav class='tabs'>\n<button class='tab active' data-tab='order' type='button'>點餐</button>\n<button class='tab' data-tab='kitchen' type='button'>廚房</button>\n<button class='tab' data-tab='sales' type='button'>營業額</button>\n</nav>\n<main>\n<section id='tab-order' class='panel'>\n<div id='menu' class='menu'></div>\n<div class='table-row'>\n<label for='table-input'>桌號</label>\n<input id='table-input' type='text' maxlength='20' autocomplete='off'>\n</div>\n<p class='cart-sum'>合計：<span id='cart-total'>0</span> 元</p>\n<button id='submit-btn' class='primary' type='button'>送出訂單</button>\n<p id='order-message' class='message' role='status'></p>\n</section>\n<section id='tab-kitchen' class='panel hidden'>\n<div class='toolbar'>\n<button id='refresh-kitchen' type='button'>重新整理</button>\n</div>\n<p id='kitchen-message' class='message' role='status'></p>\n<div id='orders' class='orders'></div>\n</section>\n<section id='tab-sales' class='panel hidden'>\n<div class='toolbar'>\n<button id='refresh-sales' type='button'>重新整理</button>\n</div>\n<div id='sales' class='sales'></div>\n</section>\n</main>\n<footer>\n<p>注意：訂單與營業額只保存在記憶體中，服務重新啟動後會全部清空。</p>\n</footer>\n<script src='app.js'></script>\n</body>\n</html>\n",
+      "style.css": "* { box-sizing: border-box; }\nbody { margin: 0; font-family: 'Noto Sans TC', sans-serif; background: #f7f5f0; color: #222; }\nheader { background: #7a4b1e; color: #fff; padding: 12px 20px; }\nheader h1 { margin: 0; font-size: 1.4rem; }\n.tabs { display: flex; gap: 4px; padding: 8px 12px 0; background: #e8e1d4; }\n.tab { flex: 1; padding: 10px; border: none; border-radius: 6px 6px 0 0; background: #d6cbb6; cursor: pointer; font-size: 1rem; }\n.tab.active { background: #fff; font-weight: bold; }\nmain { max-width: 760px; margin: 0 auto; padding: 16px; }\n.panel { background: #fff; padding: 16px; border-radius: 0 0 8px 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }\n.hidden { display: none; }\nbutton { font-size: 1rem; padding: 8px 14px; border: 1px solid #999; border-radius: 6px; background: #f0f0f0; cursor: pointer; }\nbutton:disabled { opacity: 0.5; cursor: not-allowed; }\nbutton.primary { background: #7a4b1e; color: #fff; border-color: #7a4b1e; }\n.menu-row { display: flex; align-items: center; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #eee; }\n.dish-name { flex: 1; font-size: 1.1rem; }\n.dish-price { width: 90px; color: #666; }\n.qty-controls { display: flex; align-items: center; gap: 8px; }\n.qty { min-width: 28px; text-align: center; font-weight: bold; }\n.table-row { margin: 16px 0 8px; display: flex; align-items: center; gap: 10px; }\n.table-row input { padding: 8px; font-size: 1rem; width: 160px; border: 1px solid #aaa; border-radius: 6px; }\n.cart-sum { font-size: 1.1rem; }\n.message { min-height: 1.4em; margin: 10px 0 0; }\n.message.error { color: #b00020; }\n.message.ok { color: #1b6e2a; }\n.toolbar { margin-bottom: 12px; }\n.orders { display: grid; gap: 12px; }\n.order-card { border: 1px solid #ccc; border-left-width: 6px; border-radius: 8px; padding: 12px; }\n.order-card.status-todo { border-left-color: #e08a00; background: #fff4e5; }\n.order-card.status-doing { border-left-color: #1f6fb2; background: #e8f1fb; }\n.order-card.status-done { border-left-color: #2e7d32; background: #eaf6ec; }\n.order-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }\n.order-items { margin: 4px 0 8px; padding-left: 20px; }\n.order-total { color: #555; font-size: 0.95rem; margin-bottom: 8px; }\n.badge { padding: 3px 10px; border-radius: 12px; font-size: 0.9rem; color: #fff; }\n.badge.status-todo { background: #e08a00; }\n.badge.status-doing { background: #1f6fb2; }\n.badge.status-done { background: #2e7d32; }\n.empty { color: #888; }\n.sales-total { font-size: 1.3rem; font-weight: bold; }\nfooter { text-align: center; color: #777; font-size: 0.9rem; padding: 16px; }\n"
+    }
+  },
+  "history": [
+    {
+      "at": "2026-10-17T15:43:13Z",
+      "by": "m-vvk9f",
+      "kind": "create",
+      "model": "claude-haiku-5-5",
+      "request": "做一個早餐店的點餐系統，用三個分頁切換。第一頁「點餐」：客人選餐點（蛋餅 35 元、蘿蔔糕 40 元、鐵板麵 55 元、雞塊 45 元、奶茶 30 元、豆漿 25 元），可以調整數量，填桌號後送出。第二頁「廚房」：依時間列出訂單，每張訂單可以從「待做」改成「製作中」、再改成「完成」，三種狀態用不同顏色。第三頁「營業額」：顯示今天的訂單數與總金額。",
+      "summary": "為早餐店做一個單頁三分頁的點餐系統：「點餐」分頁讓客人選擇六種餐點、調整數量並填寫桌號後送出；「廚房」分頁依時間列出訂單，可將狀態在「待做」、「製作中」、「完成」之間切換，三種狀態以不同顏色標示；「營業額」分頁顯示今天的訂單數與總金額。前端為靜態頁面，後端為一個只使用標準函式庫的 Python JSON API，資料保存在記憶體中。"
+    }
+  ],
+  "plan": {
+    "appName": "breakfast-zh",
+    "components": {
+      "api": {
+        "endpoints": [
+          {
+            "method": "GET",
+            "path": "/menu",
+            "purpose": "回傳六種餐點的名稱與價格。"
+          },
+          {
+            "method": "POST",
+            "path": "/orders",
+            "purpose": "建立新訂單，接收桌號與各品項數量，驗證後以伺服器端價格計算總金額。"
+          },
+          {
+            "method": "GET",
+            "path": "/orders",
+            "purpose": "依建立時間由早到晚列出所有訂單。"
+          },
+          {
+            "method": "PATCH",
+            "path": "/orders/{id}/status",
+            "purpose": "將指定訂單狀態依序更新為製作中或完成，拒絕不合法的狀態轉換。"
+          },
+          {
+            "method": "GET",
+            "path": "/sales/today",
+            "purpose": "回傳今天的訂單數與總金額。"
+          }
+        ],
+        "modules": [
+          {
+            "name": "server.py",
+            "purpose": "單一 Python 模組，以標準函式庫提供 JSON API 與靜態檔案，並在記憶體中保存餐點與訂單資料。"
+          }
+        ]
+      },
+      "web": {
+        "modules": [
+          {
+            "name": "index.html",
+            "purpose": "提供三個分頁的頁面結構，包含點餐表單、廚房訂單列表與營業額區塊。"
+          },
+          {
+            "name": "app.js",
+            "purpose": "處理分頁切換、購物數量調整、送出訂單、廚房狀態變更與營業額資料的載入與顯示。"
+          },
+          {
+            "name": "style.css",
+            "purpose": "定義版面樣式，並以不同顏色區分待做、製作中與完成三種訂單狀態。"
+          }
+        ]
+      }
+    },
+    "notes": "資料只保存在記憶體中，服務重啟後所有訂單與營業額都會清空，不適合需要長期保存帳務的情境；若需要保存，之後須另行加入持久化元件。目前設計沒有登入或權限控制，任何能連到服務的人都可以建立或修改訂單，建議只在店內網路或受保護的環境中使用。「今天」以伺服器的當地日期為準，請確認叢集或容器的時區設定與店家一致。單一副本執行可避免各副本資料不一致，擴充為多副本前需先處理資料共享問題。",
+    "steps": [
+      "確認餐點清單與價格：蛋餅 35 元、蘿蔔糕 40 元、鐵板麵 55 元、雞塊 45 元、奶茶 30 元、豆漿 25 元。",
+      "在 API 模組中定義固定的餐點清單與價格，並提供讀取端點。",
+      "設計訂單資料結構：訂單編號、桌號、品項與數量、小計、總金額、建立時間、狀態（待做、製作中、完成）。",
+      "實作建立訂單的端點，後端驗證桌號不可為空、數量為非負整數，並以伺服器端價格重新計算總金額。",
+      "實作列出訂單的端點，依建立時間由早到晚排序。",
+      "實作更新訂單狀態的端點，只允許依序從待做到製作中、再到完成的合法轉換。",
+      "實作今日營業額端點，依伺服器當地日期統計訂單數與總金額，只計入今天建立的訂單。",
+      "撰寫 index.html，建立三個分頁的切換介面：點餐、廚房、營業額。",
+      "在點餐分頁顯示餐點列表，每項提供增減數量的按鈕與數量顯示，並加入桌號輸入欄與送出按鈕。",
+      "送出成功後清空購物內容並顯示訂單編號；送出失敗時顯示錯誤訊息。",
+      "在廚房分頁以卡片或列表顯示訂單，依時間排序，並提供切換狀態的按鈕。",
+      "在 style.css 中為待做、製作中、完成三種狀態設定不同背景色或邊框色，並附上文字標籤以便辨識。",
+      "在營業額分頁顯示今天的訂單數與總金額，切換到此分頁時重新向 API 取得最新資料。",
+      "app.js 以 fetch 呼叫 /api 下的端點，統一處理網路錯誤與非成功回應。",
+      "後端以 Python 標準函式庫的 http.server 或同等方式提供 JSON 服務，並同時提供靜態檔案。",
+      "使用執行緒鎖保護記憶體中的訂單資料，避免多個請求同時修改造成資料錯亂。",
+      "在本機以多個瀏覽器分頁測試點餐、廚房狀態切換與營業額統計是否一致。",
+      "撰寫容器化或部署設定，確保服務可在 Rancher 管理的 Kubernetes 叢集中以單一副本執行。",
+      "確認服務重啟後資料會清空的行為已被使用者接受，並在介面上或說明中標示。"
+    ],
+    "summary": "為早餐店做一個單頁三分頁的點餐系統：「點餐」分頁讓客人選擇六種餐點、調整數量並填寫桌號後送出；「廚房」分頁依時間列出訂單，可將狀態在「待做」、「製作中」、「完成」之間切換，三種狀態以不同顏色標示；「營業額」分頁顯示今天的訂單數與總金額。前端為靜態頁面，後端為一個只使用標準函式庫的 Python JSON API，資料保存在記憶體中。"
+  },
+  "schema": 1
+}
