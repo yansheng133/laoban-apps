@@ -1,0 +1,48 @@
+{
+  "app": "night-timer",
+  "archivedAt": "2026-10-17T00:25:25Z",
+  "openedAt": "2026-10-17T00:25:04Z",
+  "round": {
+    "app": "night-timer",
+    "confirmers": [],
+    "deadline": 1792198504,
+    "id": "r-20261017-005e0a",
+    "initiator": "laoban-cli-test2",
+    "log": [
+      {
+        "args": {
+          "minutes": "30"
+        },
+        "at": "2026-10-17T00:25:04Z",
+        "by": "laoban-cli-test2",
+        "code": "opened",
+        "event": "開始一輪（30 分鐘後收斂）"
+      },
+      {
+        "at": "2026-10-17T00:25:19Z",
+        "by": "laoban-cli-test2",
+        "code": "cancelled",
+        "event": "cancelled this round"
+      }
+    ],
+    "message": "",
+    "opinions": [
+      {
+        "at": "2026-10-17T00:25:04Z",
+        "by": "laoban-cli-test2",
+        "id": "o1",
+        "replies": [],
+        "supporters": [],
+        "text": "t23-15 B: show elapsed sessions today"
+      }
+    ],
+    "plan": null,
+    "result": null,
+    "scope": [
+      "web"
+    ],
+    "state": "cancelled"
+  },
+  "schema": 1,
+  "targetNamespace": "laoban-dev"
+}
