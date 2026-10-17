@@ -21,7 +21,7 @@ spec:
         app.kubernetes.io/name: "breakfast-zh-api"
         app.kubernetes.io/component: "api"
       annotations:
-        laoban.io/content-hash: "3916578b0a3d9ddda6619049176363783ae499544b575397fe8bde055031fbf2"
+        laoban.io/content-hash: "f7208ec0df8d5d820fac9b3c9c2bc5891fe034a78bdd69d9e16b9ed32c26a154"
     spec:
       automountServiceAccountToken: false
       securityContext:

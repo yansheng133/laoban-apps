@@ -13,14 +13,16 @@ data:
     import json
 
     MENU = [
-        {'id': 'egg-pancake', 'name': '蛋餅', 'price': 35},
-        {'id': 'turnip-cake', 'name': '蘿蔔糕', 'price': 40},
-        {'id': 'iron-noodles', 'name': '鐵板麵', 'price': 55},
-        {'id': 'chicken-nuggets', 'name': '雞塊', 'price': 45},
-        {'id': 'milk-tea', 'name': '奶茶', 'price': 30},
-        {'id': 'soy-milk', 'name': '豆漿', 'price': 25},
+        {'id': 'egg-pancake', 'name': '蛋餅', 'price': 35, 'soldout': False},
+        {'id': 'turnip-cake', 'name': '蘿蔔糕', 'price': 40, 'soldout': False},
+        {'id': 'iron-noodles', 'name': '鐵板麵', 'price': 55, 'soldout': False},
+        {'id': 'chicken-nuggets', 'name': '雞塊', 'price': 45, 'soldout': False},
+        {'id': 'milk-tea', 'name': '奶茶', 'price': 30, 'soldout': False},
+        {'id': 'soy-milk', 'name': '豆漿', 'price': 25, 'soldout': False},
     ]
     MENU_BY_ID = {m['id']: m for m in MENU}
+
+    DINING_OPTIONS = ('內用', '外帶')
 
     STATUS_TODO = '待做'
     STATUS_DOING = '製作中'
@@ -47,6 +49,9 @@ data:
         table = data.get('table')
         if not isinstance(table, str) or not table.strip():
             return 400, {'error': '桌號不可為空'}
+        dining = data.get('dining')
+        if not isinstance(dining, str) or dining not in DINING_OPTIONS:
+            return 400, {'error': '請選擇內用或外帶'}
         raw_items = data.get('items')
         if not isinstance(raw_items, list):
             return 400, {'error': '品項格式錯誤'}
@@ -65,6 +70,8 @@ data:
             if qty == 0:
                 continue
             m = MENU_BY_ID[item_id]
+            if m['soldout']:
+                return 400, {'error': '「' + m['name'] + '」目前缺貨，無法點餐'}
             subtotal = m['price'] * qty
             total += subtotal
             lines.append({
@@ -81,6 +88,7 @@ data:
         order = {
             'id': NEXT_ID,
             'table': table.strip(),
+            'dining': dining,
             'items': lines,
             'total': total,
             'status': STATUS_TODO,
@@ -111,15 +119,34 @@ data:
         return 200, {'order': order}
 
 
+    def _set_soldout(item, data):
+        if not isinstance(data, dict):
+            return 400, {'error': '請求內容必須是 JSON 物件'}
+        value = data.get('soldout')
+        if not isinstance(value, bool):
+            return 400, {'error': '缺貨狀態必須是 true 或 false'}
+        item['soldout'] = value
+        return 200, {'item': dict(item)}
+
+
     def _sales_today():
         today = datetime.now().astimezone().date().isoformat()
         count = 0
         total = 0
+        counts = {}
         for o in ORDERS:
             if o['date'] == today:
                 count += 1
                 total += o['total']
-        return 200, {'date': today, 'count': count, 'total': total}
+                for line in o['items']:
+                    counts[line['id']] = counts.get(line['id'], 0) + line['qty']
+        ranked = [(idx, m) for idx, m in enumerate(MENU) if counts.get(m['id'], 0) > 0]
+        ranked.sort(key=lambda pair: (-counts[pair[1]['id']], pair[0]))
+        top_items = [
+            {'id': m['id'], 'name': m['name'], 'qty': counts[m['id']]}
+            for _, m in ranked[:3]
+        ]
+        return 200, {'date': today, 'count': count, 'total': total, 'top_items': top_items}
 
 
     def handle(method: str, path: str, body: bytes) -> tuple[int, dict]:
@@ -130,6 +157,17 @@ data:
             if method != 'GET':
                 return 405, {'error': '方法不允許'}
             return 200, {'items': [dict(m) for m in MENU]}
+
+        if len(parts) == 3 and parts[0] == 'menu' and parts[2] == 'soldout':
+            if method != 'PATCH':
+                return 405, {'error': '方法不允許'}
+            item = MENU_BY_ID.get(parts[1])
+            if item is None:
+                return 404, {'error': '找不到餐點'}
+            data = _parse_body(body)
+            if data is None:
+                return 400, {'error': 'JSON 格式錯誤'}
+            return _set_soldout(item, data)
 
         if parts == ['orders']:
             if method == 'GET':

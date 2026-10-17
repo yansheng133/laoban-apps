@@ -12,6 +12,7 @@ data:
     const STATUS_CLASS = { '待做': 'status-todo', '製作中': 'status-doing', '完成': 'status-done' };
     const NEXT_STATUS = { '待做': '製作中', '製作中': '完成' };
     const NEXT_LABEL = { '待做': '開始製作', '製作中': '標示完成' };
+    const DINING_CLASS = { '內用': 'tag-dinein', '外帶': 'tag-takeout' };
     let menu = [];
     const cart = {};
 
@@ -55,18 +56,24 @@ data:
       const container = document.getElementById('menu');
       container.textContent = '';
       for (const m of menu) {
-        const row = el('div', 'menu-row');
-        row.appendChild(el('span', 'dish-name', m.name));
+        const row = el('div', m.soldout ? 'menu-row soldout' : 'menu-row');
+        const nameBox = el('span', 'dish-name', m.name);
+        if (m.soldout) {
+          nameBox.appendChild(el('span', 'soldout-label', '缺貨'));
+        }
+        row.appendChild(nameBox);
         row.appendChild(el('span', 'dish-price', m.price + ' 元'));
         const controls = el('div', 'qty-controls');
         const minus = el('button', '', '−');
         minus.type = 'button';
+        minus.disabled = !!m.soldout;
         minus.setAttribute('aria-label', m.name + ' 減少');
         minus.addEventListener('click', () => changeQty(m.id, -1));
         const qty = el('span', 'qty', String(cart[m.id] || 0));
         qty.id = 'qty-' + m.id;
         const plus = el('button', '', '+');
         plus.type = 'button';
+        plus.disabled = !!m.soldout;
         plus.setAttribute('aria-label', m.name + ' 增加');
         plus.addEventListener('click', () => changeQty(m.id, 1));
         controls.appendChild(minus);
@@ -79,26 +86,45 @@ data:
     }
 
     function changeQty(id, delta) {
+      const m = menu.find((x) => x.id === id);
+      if (!m || m.soldout) return;
       cart[id] = Math.max(0, (cart[id] || 0) + delta);
       document.getElementById('qty-' + id).textContent = String(cart[id]);
       document.getElementById('cart-total').textContent = String(cartTotal());
     }
 
+    function applyMenu(items) {
+      menu = items;
+      for (const m of menu) {
+        if (m.soldout) cart[m.id] = 0;
+      }
+      renderMenu();
+    }
+
     async function loadMenu() {
       try {
         const data = await api('api/menu');
-        menu = data.items;
-        renderMenu();
+        applyMenu(data.items);
       } catch (err) {
         showMessage('order-message', err.message, true);
       }
     }
 
+    function selectedDining() {
+      const checked = document.querySelector('input[name=dining]:checked');
+      return checked ? checked.value : '';
+    }
+
     async function submitOrder() {
       const table = document.getElementById('table-input').value.trim();
+      const dining = selectedDining();
       const items = menu
-        .filter((m) => (cart[m.id] || 0) > 0)
+        .filter((m) => !m.soldout && (cart[m.id] || 0) > 0)
         .map((m) => ({ id: m.id, qty: cart[m.id] }));
+      if (!dining) {
+        showMessage('order-message', '請選擇內用或外帶', true);
+        return;
+      }
       if (!table) {
         showMessage('order-message', '請輸入桌號', true);
         return;
@@ -113,18 +139,28 @@ data:
         const data = await api('api/orders', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ table: table, items: items })
+          body: JSON.stringify({ table: table, dining: dining, items: items })
         });
         for (const m of menu) {
           cart[m.id] = 0;
         }
         document.getElementById('table-input').value = '';
         renderMenu();
-        showMessage('order-message', '訂單已送出，訂單編號 #' + data.order.id, false);
+        showMessage('order-message', '訂單已送出（' + data.order.dining + '），訂單編號 #' + data.order.id, false);
       } catch (err) {
         showMessage('order-message', err.message, true);
+        await refreshMenuQuietly();
       } finally {
         btn.disabled = false;
+      }
+    }
+
+    async function refreshMenuQuietly() {
+      try {
+        const data = await api('api/menu');
+        applyMenu(data.items);
+      } catch (err) {
+        /* 保留原本的錯誤訊息 */
       }
     }
 
@@ -149,7 +185,13 @@ data:
         const cls = STATUS_CLASS[o.status] || '';
         const card = el('article', 'order-card ' + cls);
         const head = el('div', 'order-head');
-        head.appendChild(el('strong', '', '#' + o.id + '　桌號 ' + o.table));
+        const title = el('strong', '', '#' + o.id + '　桌號 ' + o.table);
+        const left = el('span', 'order-title');
+        left.appendChild(title);
+        if (o.dining) {
+          left.appendChild(el('span', 'tag ' + (DINING_CLASS[o.dining] || ''), o.dining));
+        }
+        head.appendChild(left);
         head.appendChild(el('span', 'badge ' + cls, o.status));
         card.appendChild(head);
         const list = el('ul', 'order-items');
@@ -182,16 +224,68 @@ data:
       }
     }
 
+    function renderStock(items) {
+      const box = document.getElementById('stock');
+      box.textContent = '';
+      for (const m of items) {
+        const row = el('div', m.soldout ? 'stock-row soldout' : 'stock-row');
+        row.appendChild(el('span', 'dish-name', m.name));
+        row.appendChild(el('span', 'stock-state', m.soldout ? '缺貨中' : '供應中'));
+        const btn = el('button', m.soldout ? '' : 'danger', m.soldout ? '恢復供應' : '標成缺貨');
+        btn.type = 'button';
+        btn.addEventListener('click', () => toggleSoldout(m.id, !m.soldout));
+        row.appendChild(btn);
+        box.appendChild(row);
+      }
+    }
+
+    async function loadStock() {
+      try {
+        const data = await api('api/menu');
+        applyMenu(data.items);
+        renderStock(data.items);
+      } catch (err) {
+        showMessage('kitchen-message', err.message, true);
+      }
+    }
+
+    async function toggleSoldout(id, soldout) {
+      try {
+        await api('api/menu/' + id + '/soldout', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ soldout: soldout })
+        });
+        showMessage('kitchen-message', '', false);
+        await loadStock();
+      } catch (err) {
+        showMessage('kitchen-message', err.message, true);
+      }
+    }
+
     async function loadSales() {
       const box = document.getElementById('sales');
+      const top = document.getElementById('top3');
       try {
         const d = await api('api/sales/today');
         box.textContent = '';
         box.appendChild(el('p', '', '日期：' + d.date));
         box.appendChild(el('p', '', '今日訂單數：' + d.count));
         box.appendChild(el('p', 'sales-total', '今日營業額：' + d.total + ' 元'));
+        top.textContent = '';
+        const ranking = d.top_items || [];
+        if (ranking.length === 0) {
+          top.appendChild(el('p', 'empty', '尚無資料'));
+        } else {
+          const list = el('ol', 'top3-list');
+          for (const t of ranking) {
+            list.appendChild(el('li', '', t.name + '　' + t.qty + ' 份'));
+          }
+          top.appendChild(list);
+        }
       } catch (err) {
         box.textContent = '';
+        top.textContent = '';
         box.appendChild(el('p', 'message error', err.message));
       }
     }
@@ -203,7 +297,11 @@ data:
       for (const sec of document.querySelectorAll('.panel')) {
         sec.classList.toggle('hidden', sec.id !== 'tab-' + name);
       }
-      if (name === 'kitchen') loadOrders();
+      if (name === 'order') loadMenu();
+      if (name === 'kitchen') {
+        loadOrders();
+        loadStock();
+      }
       if (name === 'sales') loadSales();
     }
 
@@ -212,7 +310,10 @@ data:
         btn.addEventListener('click', () => showTab(btn.dataset.tab));
       }
       document.getElementById('submit-btn').addEventListener('click', submitOrder);
-      document.getElementById('refresh-kitchen').addEventListener('click', loadOrders);
+      document.getElementById('refresh-kitchen').addEventListener('click', () => {
+        loadOrders();
+        loadStock();
+      });
       document.getElementById('refresh-sales').addEventListener('click', loadSales);
       loadMenu();
     }
@@ -239,6 +340,11 @@ data:
     <main>
     <section id='tab-order' class='panel'>
     <div id='menu' class='menu'></div>
+    <fieldset class='dining-row'>
+    <legend>用餐方式</legend>
+    <label><input type='radio' name='dining' value='內用' checked> 內用</label>
+    <label><input type='radio' name='dining' value='外帶'> 外帶</label>
+    </fieldset>
     <div class='table-row'>
     <label for='table-input'>桌號</label>
     <input id='table-input' type='text' maxlength='20' autocomplete='off'>
@@ -253,16 +359,20 @@ data:
     </div>
     <p id='kitchen-message' class='message' role='status'></p>
     <div id='orders' class='orders'></div>
+    <h2 class='section-title'>品項缺貨管理</h2>
+    <div id='stock' class='stock'></div>
     </section>
     <section id='tab-sales' class='panel hidden'>
     <div class='toolbar'>
     <button id='refresh-sales' type='button'>重新整理</button>
     </div>
     <div id='sales' class='sales'></div>
+    <h2 class='section-title'>今天賣最好的前三名</h2>
+    <div id='top3' class='top3'></div>
     </section>
     </main>
     <footer>
-    <p>注意：訂單與營業額只保存在記憶體中，服務重新啟動後會全部清空。</p>
+    <p>注意：訂單、營業額與缺貨狀態只保存在記憶體中，服務重新啟動後會全部清空（餐點恢復為全部供應）。</p>
     </footer>
     <script src='app.js'></script>
     </body>
@@ -415,11 +525,18 @@ data:
     button { font-size: 1rem; padding: 8px 14px; border: 1px solid #999; border-radius: 6px; background: #f0f0f0; cursor: pointer; }
     button:disabled { opacity: 0.5; cursor: not-allowed; }
     button.primary { background: #7a4b1e; color: #fff; border-color: #7a4b1e; }
+    button.danger { background: #fff; color: #b00020; border-color: #b00020; }
     .menu-row { display: flex; align-items: center; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #eee; }
+    .menu-row.soldout { background: #eeeeee; color: #999; }
+    .menu-row.soldout .dish-price { color: #aaa; }
+    .soldout-label { display: inline-block; margin-left: 8px; padding: 2px 8px; border-radius: 10px; background: #888; color: #fff; font-size: 0.8rem; }
     .dish-name { flex: 1; font-size: 1.1rem; }
     .dish-price { width: 90px; color: #666; }
     .qty-controls { display: flex; align-items: center; gap: 8px; }
     .qty { min-width: 28px; text-align: center; font-weight: bold; }
+    .dining-row { margin: 16px 0 0; padding: 8px 12px; border: 1px solid #ccc; border-radius: 6px; display: flex; gap: 20px; align-items: center; }
+    .dining-row legend { padding: 0 6px; color: #555; }
+    .dining-row label { cursor: pointer; font-size: 1.05rem; }
     .table-row { margin: 16px 0 8px; display: flex; align-items: center; gap: 10px; }
     .table-row input { padding: 8px; font-size: 1rem; width: 160px; border: 1px solid #aaa; border-radius: 6px; }
     .cart-sum { font-size: 1.1rem; }
@@ -433,12 +550,21 @@ data:
     .order-card.status-doing { border-left-color: #1f6fb2; background: #e8f1fb; }
     .order-card.status-done { border-left-color: #2e7d32; background: #eaf6ec; }
     .order-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+    .order-title { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
     .order-items { margin: 4px 0 8px; padding-left: 20px; }
     .order-total { color: #555; font-size: 0.95rem; margin-bottom: 8px; }
     .badge { padding: 3px 10px; border-radius: 12px; font-size: 0.9rem; color: #fff; }
     .badge.status-todo { background: #e08a00; }
     .badge.status-doing { background: #1f6fb2; }
     .badge.status-done { background: #2e7d32; }
+    .tag { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 0.85rem; border: 1px solid; background: #fff; }
+    .tag-dinein { color: #5b3a8c; border-color: #5b3a8c; }
+    .tag-takeout { color: #a8326b; border-color: #a8326b; }
     .empty { color: #888; }
     .sales-total { font-size: 1.3rem; font-weight: bold; }
+    .section-title { font-size: 1.15rem; margin: 24px 0 8px; padding-top: 12px; border-top: 1px solid #eee; }
+    .stock-row { display: flex; align-items: center; gap: 12px; padding: 8px 0; border-bottom: 1px solid #eee; }
+    .stock-row.soldout { background: #eeeeee; color: #888; }
+    .stock-state { width: 70px; color: #666; font-size: 0.95rem; }
+    .top3-list { margin: 0; padding-left: 24px; font-size: 1.1rem; line-height: 1.8; }
     footer { text-align: center; color: #777; font-size: 0.9rem; padding: 16px; }
