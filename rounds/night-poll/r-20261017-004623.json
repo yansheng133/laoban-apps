@@ -1,0 +1,93 @@
+{
+  "app": "night-poll",
+  "archivedAt": "2026-10-17T00:19:45Z",
+  "openedAt": "2026-10-17T00:18:42Z",
+  "round": {
+    "app": "night-poll",
+    "confirmers": [],
+    "deadline": 1792196922,
+    "id": "r-20261017-004623",
+    "initiator": "user-kgw7z",
+    "log": [
+      {
+        "args": {
+          "minutes": "10"
+        },
+        "at": "2026-10-17T00:18:42Z",
+        "by": "user-kgw7z",
+        "code": "opened",
+        "event": "started a round (converges in 10 min)"
+      },
+      {
+        "args": {
+          "count": "1"
+        },
+        "at": "2026-10-17T00:18:59Z",
+        "by": "laoban-cli-test",
+        "code": "opinion",
+        "event": "gave 1 opinion(s)"
+      },
+      {
+        "args": {
+          "count": "1"
+        },
+        "at": "2026-10-17T00:18:59Z",
+        "by": "laoban-cli-test",
+        "code": "opinion",
+        "event": "gave 1 opinion(s)"
+      },
+      {
+        "args": {
+          "opinion": "o3"
+        },
+        "at": "2026-10-17T00:19:04Z",
+        "by": "laoban-cli-test",
+        "code": "withdrawn",
+        "event": "withdrew opinion o3"
+      },
+      {
+        "at": "2026-10-17T00:19:37Z",
+        "by": "user-kgw7z",
+        "code": "cancelled",
+        "event": "cancelled this round"
+      }
+    ],
+    "message": "",
+    "opinions": [
+      {
+        "at": "2026-10-17T00:18:42Z",
+        "by": "user-kgw7z",
+        "id": "o1",
+        "replies": [],
+        "supporters": [],
+        "text": "t23-4 Sam: show the total number of votes under the title"
+      },
+      {
+        "at": "2026-10-17T00:18:59Z",
+        "by": "laoban-cli-test",
+        "id": "o2",
+        "replies": [],
+        "supporters": [],
+        "text": "t23-7 A opinion one: add a reset button"
+      },
+      {
+        "at": "2026-10-17T00:18:59Z",
+        "by": "laoban-cli-test",
+        "id": "o3",
+        "replies": [],
+        "supporters": [],
+        "text": "",
+        "withdrawn": true
+      }
+    ],
+    "plan": null,
+    "result": null,
+    "scope": [
+      "web",
+      "api"
+    ],
+    "state": "cancelled"
+  },
+  "schema": 1,
+  "targetNamespace": "laoban-dev"
+}
