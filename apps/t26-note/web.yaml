@@ -21,7 +21,7 @@ spec:
         app.kubernetes.io/name: "t26-note-web"
         app.kubernetes.io/component: "web"
       annotations:
-        laoban.io/content-hash: "5c41025b06733eb00fed08bd9e489ec2e817ba63ddddf0d567ed970ec1922b71"
+        laoban.io/content-hash: "3ba5befe0c0720e0842857fb1c64a358558b2e03f9ae8c8c304136da4ae9cebb"
     spec:
       automountServiceAccountToken: false
       securityContext:

@@ -21,7 +21,7 @@ spec:
         app.kubernetes.io/name: "t26-note-api"
         app.kubernetes.io/component: "api"
       annotations:
-        laoban.io/content-hash: "df2f53f90b16ae98728946b0e418488a0a496653d7deb7e7ec3a4c06bedfe71a"
+        laoban.io/content-hash: "0462df04fafe169081153790837c83c6b673978e3839cecd6101392fe970d8bb"
     spec:
       automountServiceAccountToken: false
       securityContext:
