@@ -1,0 +1,88 @@
+{
+  "appName": "t24-water",
+  "files": {
+    "api": {
+      "handler.py": "import json\nimport time\nfrom datetime import datetime\n\n# 儲存喝水紀錄的資料結構\nrecords = []\n\ndef handle(method, path, body):\n    if method == 'GET' and path == '/records':\n        return (200, {'records': records})\n    \n    elif method == 'POST' and path == '/records':\n        try:\n            data = json.loads(body.decode('utf-8'))\n            cups = data.get('cups')\n            if cups is None or not isinstance(cups, int) or cups <= 0:\n                return (400, {'error': 'Invalid cups value'})\n            \n            # 新增紀錄\n            record = {\n                'date': datetime.now().strftime('%Y-%m-%d'),\n                'cups': cups\n            }\n            records.append(record)\n            \n            return (201, {'message': 'Record added successfully'})\n        except json.JSONDecodeError:\n            return (400, {'error': 'Invalid JSON'})\n    \n    elif method == 'GET' and path == '/stats':\n        if not records:\n            return (200, {'totalCups': 0, 'averageCups': 0})\n        \n        total_cups = sum(record['cups'] for record in records)\n        average_cups = total_cups / len(records)\n        \n        return (200, {\n            'totalCups': total_cups,\n            'averageCups': average_cups\n        })\n    \n    elif method == 'DELETE' and path == '/records':\n        records.clear()\n        return (200, {'message': 'All records cleared'})\n    \n    else:\n        return (404, {'error': 'Endpoint not found'})"
+    },
+    "web": {
+      "app.js": "document.addEventListener('DOMContentLoaded', () => {\n    const addRecordBtn = document.getElementById('addRecord');\n    const clearRecordsBtn = document.getElementById('clearRecords');\n    const cupCountInput = document.getElementById('cupCount');\n    const recordsList = document.getElementById('recordsList');\n    const totalCupsEl = document.getElementById('totalCups');\n    const averageCupsEl = document.getElementById('averageCups');\n\n    // 獲取所有紀錄\n    async function fetchRecords() {\n        try {\n            const response = await fetch('api/records');\n            const data = await response.json();\n            displayRecords(data.records);\n            updateStats(data.stats);\n        } catch (error) {\n            console.error('獲取紀錄失敗:', error);\n        }\n    }\n\n    // 新增紀錄\n    async function addRecord() {\n        const cupCount = parseInt(cupCountInput.value);\n        if (isNaN(cupCount) || cupCount <= 0) {\n            alert('請輸入有效的杯數');\n            return;\n        }\n\n        try {\n            const response = await fetch('api/records', {\n                method: 'POST',\n                headers: {\n                    'Content-Type': 'application/json'\n                },\n                body: JSON.stringify({ cups: cupCount })\n            });\n            \n            if (response.ok) {\n                cupCountInput.value = '1'; // 重置輸入框\n                fetchRecords(); // 重新獲取並顯示資料\n            } else {\n                console.error('新增紀錄失敗');\n            }\n        } catch (error) {\n            console.error('新增紀錄錯誤:', error);\n        }\n    }\n\n    // 清除所有紀錄\n    async function clearRecords() {\n        if (!confirm('確定要清除所有紀錄嗎？')) return;\n        \n        try {\n            const response = await fetch('api/records', {\n                method: 'DELETE'\n            });\n            \n            if (response.ok) {\n                fetchRecords(); // 重新獲取並顯示資料\n            } else {\n                console.error('清除紀錄失敗');\n            }\n        } catch (error) {\n            console.error('清除紀錄錯誤:', error);\n        }\n    }\n\n    // 顯示紀錄列表\n    function displayRecords(records) {\n        recordsList.innerHTML = '';\n        \n        if (records.length === 0) {\n            recordsList.innerHTML = '<li>暫無紀錄</li>';\n            return;\n        }\n        \n        records.forEach(record => {\n            const li = document.createElement('li');\n            li.textContent = `日期：${record.date}，杯數：${record.cups}`;\n            recordsList.appendChild(li);\n        });\n    }\n\n    // 更新統計資料\n    function updateStats(stats) {\n        totalCupsEl.textContent = `總共喝了多少杯：${stats.totalCups}`;\n        averageCupsEl.textContent = `平均每天喝幾杯：${stats.averageCups.toFixed(2)}`;\n    }\n\n    // 事件監聽器\n    addRecordBtn.addEventListener('click', addRecord);\n    clearRecordsBtn.addEventListener('click', clearRecords);\n\n    // 頁面載入時獲取紀錄\n    fetchRecords();\n});",
+      "index.html": "<!DOCTYPE html>\n<html lang=\"zh-TW\">\n<head>\n    <meta charset=\"UTF-8\">\n    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n    <title>喝水紀錄</title>\n    <link rel=\"stylesheet\" href=\"style.css\">\n</head>\n<body>\n    <div class=\"container\">\n        <h1>喝水紀錄</h1>\n        \n        <div class=\"input-section\">\n            <label for=\"cupCount\">今天喝了多少杯水？</label>\n            <input type=\"number\" id=\"cupCount\" min=\"1\" value=\"1\">\n            <button id=\"addRecord\">新增紀錄</button>\n        </div>\n        \n        <div class=\"stats-section\">\n            <h2>統計資料</h2>\n            <p id=\"totalCups\">總共喝了多少杯：0</p>\n            <p id=\"averageCups\">平均每天喝幾杯：0</p>\n        </div>\n        \n        <div class=\"records-section\">\n            <h2>喝水紀錄</h2>\n            <button id=\"clearRecords\">清除所有紀錄</button>\n            <ul id=\"recordsList\"></ul>\n        </div>\n    </div>\n    \n    <script src=\"app.js\"></script>\n</body>\n</html>",
+      "style.css": "body {\n    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;\n    background-color: #e3f2fd;\n    margin: 0;\n    padding: 20px;\n}\n\n.container {\n    max-width: 600px;\n    margin: 0 auto;\n    background-color: white;\n    padding: 20px;\n    border-radius: 8px;\n    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);\n}\n\nh1 {\n    color: #1976d2;\n    text-align: center;\n}\n\nh2 {\n    color: #0d47a1;\n    border-bottom: 2px solid #1976d2;\n    padding-bottom: 5px;\n}\n\n.input-section {\n    margin-bottom: 20px;\n}\n\nlabel {\n    display: block;\n    margin-bottom: 5px;\n    font-weight: bold;\n}\n\ninput[type=\"number\"] {\n    width: 100px;\n    padding: 8px;\n    margin-right: 10px;\n    border: 1px solid #ccc;\n    border-radius: 4px;\n}\n\nbutton {\n    background-color: #1976d2;\n    color: white;\n    padding: 10px 15px;\n    border: none;\n    border-radius: 4px;\n    cursor: pointer;\n    margin-right: 10px;\n}\n\nbutton:hover {\n    background-color: #1565c0;\n}\n\n.stats-section {\n    margin-bottom: 20px;\n}\n\n.records-section {\n    margin-top: 30px;\n}\n\nul {\n    list-style-type: none;\n    padding: 0;\n}\n\nli {\n    padding: 10px;\n    border-bottom: 1px solid #eee;\n    background-color: #f5f5f5;\n    margin-bottom: 5px;\n    border-radius: 4px;\n}\n\nli:last-child {\n    border-bottom: none;\n}"
+    }
+  },
+  "history": [
+    {
+      "at": "2026-10-17T06:43:39Z",
+      "by": "user-kgw7z",
+      "kind": "create",
+      "model": "qwen3-coder:30b",
+      "request": "一個記錄每天喝了幾杯水的頁面",
+      "summary": "一個用來記錄每天喝水杯數的網頁應用程式，包含前端介面和後端API。"
+    }
+  ],
+  "plan": {
+    "appName": "t24-water",
+    "components": {
+      "api": {
+        "endpoints": [
+          {
+            "method": "GET",
+            "path": "/records",
+            "purpose": "取得所有喝水紀錄"
+          },
+          {
+            "method": "POST",
+            "path": "/records",
+            "purpose": "新增喝水紀錄"
+          },
+          {
+            "method": "GET",
+            "path": "/stats",
+            "purpose": "取得統計資料"
+          },
+          {
+            "method": "DELETE",
+            "path": "/records",
+            "purpose": "清除所有紀錄"
+          }
+        ],
+        "modules": [
+          {
+            "name": "water_api.py",
+            "purpose": "處理喝水紀錄的HTTP API"
+          }
+        ]
+      },
+      "web": {
+        "modules": [
+          {
+            "name": "index.html",
+            "purpose": "主頁面，包含使用者介面"
+          },
+          {
+            "name": "style.css",
+            "purpose": "頁面樣式定義"
+          },
+          {
+            "name": "app.js",
+            "purpose": "前端互動邏輯和API呼叫"
+          },
+          {
+            "name": "data.js",
+            "purpose": "管理資料相關功能"
+          }
+        ]
+      }
+    },
+    "notes": "應用程式使用記憶體儲存資料，不包含永續性儲存。前端使用JavaScript與後端API進行通訊。",
+    "steps": [
+      "建立前端HTML、CSS、JavaScript檔案",
+      "建立後端Python API模組",
+      "實作API端點以儲存和取得喝水紀錄",
+      "設定前端與後端API互動",
+      "部署應用程式到Rancher Kubernetes集群"
+    ],
+    "summary": "一個用來記錄每天喝水杯數的網頁應用程式，包含前端介面和後端API。"
+  },
+  "schema": 1
+}
