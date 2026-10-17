@@ -13,15 +13,17 @@ data:
     import datetime
 
     MENU = [
-        {'id': 'egg-crepe', 'name': 'Egg crepe', 'price_cents': 350},
-        {'id': 'radish-cake', 'name': 'Radish cake', 'price_cents': 400},
-        {'id': 'teppan-noodles', 'name': 'Teppan noodles', 'price_cents': 550},
-        {'id': 'chicken-nuggets', 'name': 'Chicken nuggets', 'price_cents': 450},
-        {'id': 'milk-tea', 'name': 'Milk tea', 'price_cents': 300},
-        {'id': 'soy-milk', 'name': 'Soy milk', 'price_cents': 250},
+        {'id': 'egg-crepe', 'name': 'Egg crepe', 'price_cents': 350, 'soldOut': False},
+        {'id': 'radish-cake', 'name': 'Radish cake', 'price_cents': 400, 'soldOut': False},
+        {'id': 'teppan-noodles', 'name': 'Teppan noodles', 'price_cents': 550, 'soldOut': False},
+        {'id': 'chicken-nuggets', 'name': 'Chicken nuggets', 'price_cents': 450, 'soldOut': False},
+        {'id': 'milk-tea', 'name': 'Milk tea', 'price_cents': 300, 'soldOut': False},
+        {'id': 'soy-milk', 'name': 'Soy milk', 'price_cents': 250, 'soldOut': False},
     ]
     MENU_BY_ID = {m['id']: m for m in MENU}
+    MENU_INDEX = {m['id']: i for i, m in enumerate(MENU)}
     STATUSES = ['todo', 'cooking', 'done']
+    ORDER_TYPES = ['dine_in', 'take_out']
 
     ORDERS = []
     NEXT_ID = [1]
@@ -39,8 +41,26 @@ data:
         return data, None
 
 
+    def _item_view(m):
+        return dict(m, price=m['price_cents'] / 100.0)
+
+
     def _menu_view():
-        return [dict(m, price=m['price_cents'] / 100.0) for m in MENU]
+        return [_item_view(m) for m in MENU]
+
+
+    def _set_sold_out(item_id, body):
+        item = MENU_BY_ID.get(item_id)
+        if item is None:
+            return 404, {'error': 'Menu item not found.'}
+        data, err = _parse_body(body)
+        if err:
+            return 400, {'error': err}
+        sold_out = data.get('soldOut')
+        if not isinstance(sold_out, bool):
+            return 400, {'error': 'soldOut must be true or false.'}
+        item['soldOut'] = sold_out
+        return 200, {'item': _item_view(item)}
 
 
     def _create_order(body):
@@ -63,6 +83,10 @@ data:
         if len(table) > 20:
             return 400, {'error': 'Table number is too long.'}
 
+        order_type = data.get('order_type', data.get('orderType'))
+        if not isinstance(order_type, str) or order_type not in ORDER_TYPES:
+            return 400, {'error': 'Please choose Dine in or Take out (order_type must be dine_in or take_out).'}
+
         items = data.get('items')
         if not isinstance(items, list) or len(items) == 0:
             return 400, {'error': 'An order needs at least one item.'}
@@ -77,6 +101,8 @@ data:
                 return 400, {'error': 'Unknown menu item.'}
             if isinstance(qty, bool) or not isinstance(qty, int) or qty < 1:
                 return 400, {'error': 'Quantities must be positive whole numbers.'}
+            if MENU_BY_ID[item_id]['soldOut']:
+                return 409, {'error': '%s is sold out.' % MENU_BY_ID[item_id]['name']}
             merged[item_id] = merged.get(item_id, 0) + qty
             if merged[item_id] > 99:
                 return 400, {'error': 'Quantity per item is limited to 99.'}
@@ -96,6 +122,7 @@ data:
         order = {
             'id': NEXT_ID[0],
             'table': table,
+            'order_type': order_type,
             'items': order_items,
             'total_cents': total,
             'total': total / 100.0,
@@ -150,15 +177,27 @@ data:
         today = datetime.date.today().isoformat()
         count = 0
         total = 0
+        quantities = {}
         for o in ORDERS:
             if o['created_at'][:10] == today:
                 count += 1
                 total += o['total_cents']
+                for it in o['items']:
+                    quantities[it['id']] = quantities.get(it['id'], 0) + it['quantity']
+        ranked = sorted(quantities.items(), key=lambda kv: (-kv[1], MENU_INDEX.get(kv[0], 10 ** 6)))
+        top_items = []
+        for item_id, qty in ranked[:3]:
+            top_items.append({
+                'id': item_id,
+                'name': MENU_BY_ID[item_id]['name'],
+                'quantity': qty,
+            })
         return 200, {
             'date': today,
             'order_count': count,
             'total_cents': total,
             'total': total / 100.0,
+            'topItems': top_items,
         }
 
 
@@ -170,6 +209,11 @@ data:
             if method != 'GET':
                 return 405, {'error': 'Method not allowed.'}
             return 200, {'menu': _menu_view()}
+
+        if len(parts) == 3 and parts[0] == 'menu' and parts[2] == 'sold-out':
+            if method not in ('PATCH', 'PUT', 'POST'):
+                return 405, {'error': 'Method not allowed.'}
+            return _set_sold_out(parts[1], body)
 
         if parts == ['orders']:
             if method == 'GET':

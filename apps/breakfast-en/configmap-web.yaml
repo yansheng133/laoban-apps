@@ -13,6 +13,7 @@ data:
 
     var STATUS_LABELS = {todo: 'To do', cooking: 'Cooking', done: 'Done'};
     var NEXT_LABELS = {todo: 'Start cooking', cooking: 'Mark done'};
+    var TYPE_LABELS = {dine_in: 'Dine in', take_out: 'Take out'};
     var menu = [];
     var quantities = {};
     var currentTab = 'order';
@@ -49,6 +50,13 @@ data:
       m.className = 'message' + (text ? (isError ? ' error' : ' ok') : '');
     }
 
+    function findItem(id) {
+      for (var i = 0; i < menu.length; i++) {
+        if (menu[i].id === id) { return menu[i]; }
+      }
+      return null;
+    }
+
     /* ---------- Order tab ---------- */
 
     function orderTotal() {
@@ -64,6 +72,8 @@ data:
     }
 
     function changeQty(id, delta) {
+      var item = findItem(id);
+      if (!item || item.soldOut) { return; }
       var q = (quantities[id] || 0) + delta;
       if (q < 0) { q = 0; }
       if (q > 99) { q = 99; }
@@ -79,19 +89,26 @@ data:
       var box = byId('menu');
       box.textContent = '';
       menu.forEach(function (item) {
-        var card = el('div', 'card');
+        var soldOut = !!item.soldOut;
+        var q = soldOut ? 0 : (quantities[item.id] || 0);
+        var card = el('div', 'card' + (soldOut ? ' sold-out' : (q > 0 ? ' selected' : '')));
         card.id = 'card-' + item.id;
         card.appendChild(el('div', 'card-name', item.name));
         card.appendChild(el('div', 'card-price', money(item.price_cents)));
+        if (soldOut) {
+          card.appendChild(el('div', 'card-flag', 'Sold out'));
+        }
         var controls = el('div', 'qty');
         var minus = el('button', 'qty-btn', '-');
         minus.type = 'button';
+        minus.disabled = soldOut;
         minus.setAttribute('aria-label', 'Remove one ' + item.name);
         minus.addEventListener('click', function () { changeQty(item.id, -1); });
-        var count = el('span', 'qty-count', '0');
+        var count = el('span', 'qty-count', String(q));
         count.id = 'qty-' + item.id;
         var plus = el('button', 'qty-btn', '+');
         plus.type = 'button';
+        plus.disabled = soldOut;
         plus.setAttribute('aria-label', 'Add one ' + item.name);
         plus.addEventListener('click', function () { changeQty(item.id, 1); });
         controls.appendChild(minus);
@@ -103,27 +120,74 @@ data:
       updateTotal();
     }
 
+    function toggleSoldOut(item) {
+      api('menu/' + item.id + '/sold-out', {
+        method: 'PATCH',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({soldOut: !item.soldOut})
+      }).then(function () {
+        setMessage('kitchen-message', '', false);
+        return loadMenu();
+      }).catch(function (err) {
+        setMessage('kitchen-message', err.message, true);
+        loadMenu();
+      });
+    }
+
+    function renderAvailability() {
+      var box = byId('availability');
+      box.textContent = '';
+      menu.forEach(function (item) {
+        var soldOut = !!item.soldOut;
+        var row = el('div', 'avail-row' + (soldOut ? ' is-sold-out' : ''));
+        row.appendChild(el('span', 'avail-name', item.name));
+        row.appendChild(el('span', 'avail-state', soldOut ? 'Sold out' : 'Available'));
+        var btn = el('button', 'toggle' + (soldOut ? ' toggle-on' : ''), soldOut ? 'Mark available' : 'Mark sold out');
+        btn.type = 'button';
+        btn.addEventListener('click', function () { toggleSoldOut(item); });
+        row.appendChild(btn);
+        box.appendChild(row);
+      });
+    }
+
     function loadMenu() {
       return api('menu').then(function (data) {
         menu = data.menu || [];
         menu.forEach(function (item) {
-          if (quantities[item.id] === undefined) { quantities[item.id] = 0; }
+          if (quantities[item.id] === undefined || item.soldOut) { quantities[item.id] = 0; }
         });
         renderMenu();
+        renderAvailability();
       }).catch(function (err) {
-        setMessage('order-message', 'Could not load the menu: ' + err.message, true);
+        var target = currentTab === 'kitchen' ? 'kitchen-message' : 'order-message';
+        setMessage(target, 'Could not load the menu: ' + err.message, true);
       });
+    }
+
+    function selectedOrderType() {
+      var checked = document.querySelector('input[name=order_type]:checked');
+      return checked ? checked.value : '';
+    }
+
+    function clearOrderType() {
+      var radios = document.querySelectorAll('input[name=order_type]');
+      for (var i = 0; i < radios.length; i++) { radios[i].checked = false; }
     }
 
     function submitOrder() {
       var table = byId('table').value.trim();
+      var orderType = selectedOrderType();
       var items = [];
       menu.forEach(function (item) {
         var q = quantities[item.id] || 0;
-        if (q > 0) { items.push({id: item.id, quantity: q}); }
+        if (q > 0 && !item.soldOut) { items.push({id: item.id, quantity: q}); }
       });
       if (!table) {
         setMessage('order-message', 'Please enter a table number.', true);
+        return;
+      }
+      if (!orderType) {
+        setMessage('order-message', 'Please choose Dine in or Take out.', true);
         return;
       }
       if (items.length === 0) {
@@ -135,15 +199,17 @@ data:
       api('orders', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({table: table, items: items})
+        body: JSON.stringify({table: table, order_type: orderType, items: items})
       }).then(function (data) {
         var order = data.order;
         menu.forEach(function (item) { quantities[item.id] = 0; });
         renderMenu();
         byId('table').value = '';
-        setMessage('order-message', 'Order #' + order.id + ' for table ' + order.table + ' sent. Total: ' + money(order.total_cents) + '.', false);
+        clearOrderType();
+        setMessage('order-message', 'Order #' + order.id + ' (' + (TYPE_LABELS[order.order_type] || order.order_type) + ') for table ' + order.table + ' sent. Total: ' + money(order.total_cents) + '.', false);
       }).catch(function (err) {
         setMessage('order-message', err.message, true);
+        loadMenu();
       }).then(function () {
         btn.disabled = false;
       });
@@ -180,7 +246,12 @@ data:
         head.appendChild(el('span', 'order-title', 'Order #' + o.id + ' - Table ' + o.table));
         head.appendChild(el('span', 'badge badge-' + o.status, STATUS_LABELS[o.status] || o.status));
         card.appendChild(head);
-        card.appendChild(el('div', 'order-time', 'Placed at ' + String(o.created_at).slice(11, 16)));
+        var meta = el('div', 'order-meta');
+        if (o.order_type) {
+          meta.appendChild(el('span', 'type-badge type-' + o.order_type, TYPE_LABELS[o.order_type] || o.order_type));
+        }
+        meta.appendChild(el('span', 'order-time', 'Placed at ' + String(o.created_at).slice(11, 16)));
+        card.appendChild(meta);
         var list = el('ul', 'order-items');
         o.items.forEach(function (it) {
           list.appendChild(el('li', '', it.quantity + ' x ' + it.name));
@@ -210,12 +281,30 @@ data:
       });
     }
 
+    function loadKitchen() {
+      loadOrders();
+      loadMenu();
+    }
+
     /* ---------- Sales tab ---------- */
+
+    function renderTopItems(items) {
+      var list = byId('top-items');
+      list.textContent = '';
+      items.forEach(function (t) {
+        var li = el('li', 'top-item');
+        li.appendChild(el('span', 'top-name', t.name));
+        li.appendChild(el('span', 'top-qty', t.quantity + ' sold'));
+        list.appendChild(li);
+      });
+      byId('top-empty').className = items.length ? 'empty hidden' : 'empty';
+    }
 
     function loadSales() {
       return api('sales/today').then(function (data) {
         byId('sales-count').textContent = String(data.order_count);
         byId('sales-total').textContent = money(data.total_cents);
+        renderTopItems(data.topItems || []);
         setMessage('sales-message', '', false);
       }).catch(function (err) {
         setMessage('sales-message', 'Could not load sales: ' + err.message, true);
@@ -225,7 +314,7 @@ data:
     /* ---------- Tabs ---------- */
 
     function refreshCurrent() {
-      if (currentTab === 'kitchen') { loadOrders(); }
+      if (currentTab === 'kitchen') { loadKitchen(); }
       else if (currentTab === 'sales') { loadSales(); }
     }
 
@@ -239,6 +328,7 @@ data:
       ['order', 'kitchen', 'sales'].forEach(function (n) {
         byId('panel-' + n).className = 'panel' + (n === name ? '' : ' hidden');
       });
+      if (name === 'order') { loadMenu(); }
       refreshCurrent();
     }
 
@@ -250,7 +340,7 @@ data:
         })(tabs[i]);
       }
       byId('submit').addEventListener('click', submitOrder);
-      byId('refresh').addEventListener('click', loadOrders);
+      byId('refresh').addEventListener('click', loadKitchen);
       byId('filter').addEventListener('change', function () { renderOrders(lastOrders); });
       loadMenu();
       setInterval(refreshCurrent, 5000);
@@ -280,6 +370,11 @@ data:
     <div class='order-bar'>
     <label for='table'>Table number</label>
     <input id='table' type='text' inputmode='numeric' maxlength='20' placeholder='e.g. 5'>
+    <fieldset class='order-type' id='order-type'>
+    <legend>Order type</legend>
+    <label class='type-option'><input type='radio' name='order_type' value='dine_in'> Dine in</label>
+    <label class='type-option'><input type='radio' name='order_type' value='take_out'> Take out</label>
+    </fieldset>
     <div class='total'>Total: <strong id='total'>$0.00</strong></div>
     <button type='button' id='submit' class='primary'>Send order</button>
     </div>
@@ -299,6 +394,8 @@ data:
     </div>
     <p id='kitchen-message' class='message' role='status'></p>
     <div id='orders' class='orders'></div>
+    <h3 class='section-title'>Menu availability</h3>
+    <div id='availability' class='availability'></div>
     </section>
     <section id='panel-sales' class='panel hidden'>
     <h2>Today's sales</h2>
@@ -306,6 +403,9 @@ data:
     <div class='stat'><span class='stat-label'>Orders</span><span class='stat-value' id='sales-count'>0</span></div>
     <div class='stat'><span class='stat-label'>Total sales</span><span class='stat-value' id='sales-total'>$0.00</span></div>
     </div>
+    <h3 class='section-title'>Top 3 items</h3>
+    <ol id='top-items' class='top-items'></ol>
+    <p id='top-empty' class='empty'>No sales yet today.</p>
     <p id='sales-message' class='message' role='status'></p>
     </section>
     </main>
@@ -474,6 +574,7 @@ data:
     main { max-width: 1000px; margin: 0 auto; padding: 16px; }
     .panel.hidden, .hidden { display: none; }
     h2 { margin-top: 0; }
+    .section-title { margin: 24px 0 10px; font-size: 1.15rem; }
     .menu {
       display: grid;
       grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
@@ -489,6 +590,14 @@ data:
       gap: 6px;
     }
     .card.selected { border-color: #7a4a21; background: #fff8ec; }
+    .card.sold-out {
+      background: #e4e4e4;
+      border-color: #c4c4c4;
+      color: #8a8a8a;
+    }
+    .card.sold-out .card-price { color: #8a8a8a; }
+    .card.sold-out .card-name { text-decoration: line-through; }
+    .card-flag { font-weight: 700; color: #6e6e6e; }
     .card-name { font-weight: 700; font-size: 1.05rem; }
     .card-price { color: #6b6256; }
     .qty { display: flex; align-items: center; gap: 12px; margin-top: 4px; }
@@ -503,6 +612,12 @@ data:
       cursor: pointer;
     }
     .qty-btn:active { background: #f1e3cf; }
+    .qty-btn:disabled {
+      border-color: #bdbdbd;
+      background: #d6d6d6;
+      color: #9a9a9a;
+      cursor: not-allowed;
+    }
     .qty-count { min-width: 28px; text-align: center; font-size: 1.2rem; font-weight: 700; }
     .order-bar {
       margin-top: 16px;
@@ -515,13 +630,32 @@ data:
       border-radius: 10px;
       padding: 12px;
     }
-    .order-bar input, .toolbar select {
+    .order-bar input[type=text], .toolbar select {
       padding: 10px;
       font-size: 1rem;
       border: 1px solid #c9bda9;
       border-radius: 6px;
     }
-    .order-bar input { width: 110px; }
+    .order-bar input[type=text] { width: 110px; }
+    .order-type {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      border: 1px solid #c9bda9;
+      border-radius: 8px;
+      margin: 0;
+      padding: 4px 10px 6px;
+    }
+    .order-type legend { font-size: 0.8rem; color: #6b6256; padding: 0 4px; }
+    .type-option {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 8px;
+      font-size: 1rem;
+      cursor: pointer;
+    }
+    .type-option input { width: 18px; height: 18px; }
     .total { margin-left: auto; font-size: 1.2rem; }
     button.primary {
       background: #7a4a21;
@@ -564,7 +698,8 @@ data:
     .order.status-done { border-left-color: #2f9e44; }
     .order-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
     .order-title { font-weight: 700; }
-    .order-time { color: #6b6256; font-size: 0.9rem; margin: 4px 0; }
+    .order-meta { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin: 6px 0 4px; }
+    .order-time { color: #6b6256; font-size: 0.9rem; }
     .order-items { margin: 8px 0; padding-left: 20px; }
     .order-foot { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
     .order-total { font-weight: 700; }
@@ -579,6 +714,43 @@ data:
     .badge-todo { background: #e8590c; }
     .badge-cooking { background: #f2b705; color: #3a2f00; }
     .badge-done { background: #2f9e44; }
+    .type-badge {
+      padding: 3px 10px;
+      border-radius: 6px;
+      font-size: 0.85rem;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+    .type-dine_in { background: #dbeafe; color: #1e3a8a; border: 1px solid #93c5fd; }
+    .type-take_out { background: #fce7f3; color: #831843; border: 1px solid #f9a8d4; }
+    .availability {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+      gap: 10px;
+    }
+    .avail-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      background: #fff;
+      border: 1px solid #e6dccb;
+      border-radius: 10px;
+      padding: 10px 12px;
+    }
+    .avail-row.is-sold-out { background: #e4e4e4; border-color: #c4c4c4; color: #7a7a7a; }
+    .avail-name { font-weight: 700; flex: 1; }
+    .avail-state { font-size: 0.85rem; color: #6b6256; }
+    .toggle {
+      padding: 8px 12px;
+      font-size: 0.9rem;
+      border: 1px solid #7a4a21;
+      background: #fff;
+      color: #7a4a21;
+      border-radius: 6px;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    .toggle.toggle-on { background: #7a4a21; color: #fff; }
     .stats { display: flex; flex-wrap: wrap; gap: 12px; }
     .stat {
       flex: 1 1 200px;
@@ -592,9 +764,25 @@ data:
     }
     .stat-label { color: #6b6256; }
     .stat-value { font-size: 2.2rem; font-weight: 700; color: #7a4a21; }
+    .top-items {
+      margin: 0;
+      padding-left: 28px;
+      background: #fff;
+      border: 1px solid #e6dccb;
+      border-radius: 10px;
+      padding-top: 8px;
+      padding-bottom: 8px;
+    }
+    .top-items:empty { display: none; }
+    .top-item { padding: 8px 6px; font-size: 1.05rem; }
+    .top-item::marker { font-weight: 700; color: #7a4a21; }
+    .top-name { font-weight: 700; margin-right: 10px; }
+    .top-qty { color: #6b6256; }
     @media (max-width: 520px) {
       main { padding: 12px; }
       .total { margin-left: 0; width: 100%; }
       .order-bar button.primary { width: 100%; }
+      .order-type { width: 100%; justify-content: space-around; }
       .tab { flex: 1; padding: 12px 8px; }
+      .avail-row { flex-wrap: wrap; }
     }
