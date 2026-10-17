@@ -1,0 +1,86 @@
+{
+  "appName": "t24-fail",
+  "files": {
+    "api": {
+      "handler.py": "import json\nimport time\nfrom datetime import datetime\n\n# 模擬資料庫，儲存步數記錄\nsteps_data = []\n\n# 紀錄的ID計數器\nnext_id = 1\n\ndef handle(method, path, body):\n    global steps_data, next_id\n    \n    if method == \"GET\" and path == \"/steps\":\n        return (200, {\"steps\": steps_data})\n    \n    elif method == \"POST\" and path == \"/steps\":\n        try:\n            data = json.loads(body.decode())\n            steps = data.get(\"steps\")\n            \n            if steps is None or not isinstance(steps, int) or steps < 0:\n                return (400, {\"error\": \"步數必須是大於等於0的整數\"})\n            \n            # 建立新的記錄\n            new_step = {\n                \"id\": next_id,\n                \"steps\": steps,\n                \"timestamp\": datetime.now().isoformat()\n            }\n            \n            steps_data.append(new_step)\n            next_id += 1\n            \n            return (201, {\"message\": \"步數記錄新增成功\", \"step\": new_step})\n        except json.JSONDecodeError:\n            return (400, {\"error\": \"無效的JSON格式\"})\n    \n    elif method == \"GET\" and path == \"/steps/today\":\n        # 獲取今天的步數總和\n        today = datetime.now().strftime('%Y-%m-%d')\n        today_steps = [s for s in steps_data if s[\"timestamp\"].startswith(today)]\n        total_steps = sum(s[\"steps\"] for s in today_steps)\n        \n        return (200, {\"steps\": total_steps})\n    \n    elif method == \"DELETE\" and path.startswith(\"/steps/\"):\n        # 提取步數記錄的ID\n        try:\n            step_id = int(path.split(\"/\")[3])\n        except (ValueError, IndexError):\n            return (400, {\"error\": \"無效的步數記錄ID\"})\n        \n        # 找到並刪除對應的記錄\n        for i, step in enumerate(steps_data):\n            if step[\"id\"] == step_id:\n                steps_data.pop(i)\n                return (200, {\"message\": \"步數記錄已刪除\"})\n        \n        # 如果沒有找到指定ID的記錄\n        return (404, {\"error\": \"找不到指定的步數記錄\"})\n    \n    else:\n        return (404, {\"error\": \"路徑未找到\"})"
+    },
+    "web": {
+      "app.js": "document.addEventListener('DOMContentLoaded', function() {\n    const stepForm = document.getElementById('stepForm');\n    const stepsHistory = document.getElementById('stepsHistory');\n    const todayValue = document.getElementById('todayValue');\n\n    // 獲取今天的步數\n    fetch('api/steps/today')\n        .then(response => response.json())\n        .then(data => {\n            if (data.steps !== undefined) {\n                todayValue.textContent = data.steps + ' 步';\n            } else {\n                todayValue.textContent = '無記錄';\n            }\n        })\n        .catch(error => {\n            console.error('獲取今天步數時出錯:', error);\n            todayValue.textContent = '錯誤';\n        });\n\n    // 獲取歷史步數記錄\n    fetch('api/steps')\n        .then(response => response.json())\n        .then(data => {\n            displaySteps(data.steps || []);\n        })\n        .catch(error => {\n            console.error('獲取步數記錄時出錯:', error);\n        });\n\n    // 提交新步數\n    stepForm.addEventListener('submit', function(e) {\n        e.preventDefault();\n        const stepsInput = document.getElementById('steps');\n        const steps = parseInt(stepsInput.value);\n\n        if (isNaN(steps) || steps < 0) {\n            alert('請輸入有效的步數');\n            return;\n        }\n\n        fetch('api/steps', {\n            method: 'POST',\n            headers: {\n                'Content-Type': 'application/json'\n            },\n            body: JSON.stringify({ steps: steps })\n        })\n        .then(response => response.json())\n        .then(data => {\n            stepsInput.value = '';\n            // 重新獲取並顯示所有記錄\n            fetch('api/steps')\n                .then(response => response.json())\n                .then(data => {\n                    displaySteps(data.steps || []);\n                    // 更新今天步數\n                    fetch('api/steps/today')\n                        .then(response => response.json())\n                        .then(todayData => {\n                            if (todayData.steps !== undefined) {\n                                todayValue.textContent = todayData.steps + ' 步';\n                            } else {\n                                todayValue.textContent = '無記錄';\n                            }\n                        });\n                });\n        })\n        .catch(error => {\n            console.error('新增步數時出錯:', error);\n            alert('新增步數失敗');\n        });\n    });\n\n    // 顯示步數記錄\n    function displaySteps(steps) {\n        stepsHistory.innerHTML = '';\n        if (steps.length === 0) {\n            stepsHistory.innerHTML = '<li>無記錄</li>';\n            return;\n        }\n\n        // 按時間倒序排列\n        steps.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));\n\n        steps.forEach(step => {\n            const li = document.createElement('li');\n            const date = new Date(step.timestamp);\n            li.textContent = `${step.steps} 步 - ${date.toLocaleString('zh-Hant')}`;\n            \n            // 添加刪除按鈕\n            const deleteBtn = document.createElement('button');\n            deleteBtn.textContent = '刪除';\n            deleteBtn.onclick = function() {\n                fetch(`api/steps/${step.id}`, {\n                    method: 'DELETE'\n                })\n                .then(response => {\n                    if (response.ok) {\n                        // 重新獲取並顯示所有記錄\n                        fetch('api/steps')\n                            .then(response => response.json())\n                            .then(data => {\n                                displaySteps(data.steps || []);\n                                // 更新今天步數\n                                fetch('api/steps/today')\n                                    .then(response => response.json())\n                                    .then(todayData => {\n                                        if (todayData.steps !== undefined) {\n                                            todayValue.textContent = todayData.steps + ' 步';\n                                        } else {\n                                            todayValue.textContent = '無記錄';\n                                        }\n                                    });\n                            });\n                    } else {\n                        console.error('刪除步數記錄失敗');\n                        alert('刪除失敗');\n                    }\n                })\n                .catch(error => {\n                    console.error('刪除步數記錄時出錯:', error);\n                    alert('刪除失敗');\n                });\n            };\n            \n            li.appendChild(deleteBtn);\n            stepsHistory.appendChild(li);\n        });\n    }\n});",
+      "index.html": "<!DOCTYPE html>\n<html lang=\"zh-Hant\">\n<head>\n    <meta charset=\"UTF-8\">\n    <title>步數記錄</title>\n    <link rel=\"stylesheet\" href=\"style.css\">\n</head>\n<body>\n    <div class=\"container\">\n        <h1>步數記錄</h1>\n        \n        <form id=\"stepForm\">\n            <label for=\"steps\">步數：</label>\n            <input type=\"number\" id=\"steps\" name=\"steps\" required>\n            <button type=\"submit\">新增步數</button>\n        </form>\n        \n        <div id=\"todaySteps\">\n            <h2>今天步數</h2>\n            <p id=\"todayValue\">載入中...</p>\n        </div>\n        \n        <div id=\"stepsList\">\n            <h2>歷史記錄</h2>\n            <ul id=\"stepsHistory\"></ul>\n        </div>\n    </div>\n    \n    <script src=\"app.js\"></script>\n</body>\n</html>",
+      "style.css": "body {\n    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;\n    background-color: #f5f5f5;\n    margin: 0;\n    padding: 20px;\n}\n\n.container {\n    max-width: 600px;\n    margin: 0 auto;\n    background-color: white;\n    padding: 20px;\n    border-radius: 8px;\n    box-shadow: 0 2px 10px rgba(0,0,0,0.1);\n}\n\nh1 {\n    text-align: center;\n    color: #333;\n    margin-bottom: 30px;\n}\n\nh2 {\n    color: #555;\n    border-bottom: 2px solid #eee;\n    padding-bottom: 5px;\n}\n\nform {\n    display: flex;\n    flex-direction: column;\n    gap: 10px;\n    margin-bottom: 30px;\n}\n\nlabel {\n    font-weight: bold;\n    color: #666;\n}\n\ninput[type=\"number\"] {\n    padding: 10px;\n    border: 1px solid #ddd;\n    border-radius: 4px;\n    font-size: 16px;\n}\n\nbutton {\n    padding: 12px;\n    background-color: #4CAF50;\n    color: white;\n    border: none;\n    border-radius: 4px;\n    cursor: pointer;\n    font-size: 16px;\n    transition: background-color 0.3s;\n}\n\nbutton:hover {\n    background-color: #45a049;\n}\n\n#todaySteps p {\n    font-size: 24px;\n    text-align: center;\n    color: #2c5aa0;\n    font-weight: bold;\n}\n\n#stepsHistory li {\n    padding: 10px;\n    border-bottom: 1px solid #eee;\n    display: flex;\n    justify-content: space-between;\n    align-items: center;\n}\n\n#stepsHistory li:last-child {\n    border-bottom: none;\n}\n\n#stepsHistory button {\n    background-color: #f44336;\n    padding: 5px 10px;\n    font-size: 14px;\n}\n\n#stepsHistory button:hover {\n    background-color: #da190b;\n}\n\nli {\n    list-style-type: none;\n}"
+    }
+  },
+  "history": [
+    {
+      "at": "2026-10-17T06:57:10Z",
+      "by": "user-kgw7z",
+      "kind": "create",
+      "model": "qwen3-coder:30b",
+      "request": "一個記錄每天走了幾步的頁面",
+      "summary": "一個用來記錄每天步數的簡單網頁應用程式，包含前端介面和後端API。"
+    }
+  ],
+  "plan": {
+    "appName": "t24-fail",
+    "components": {
+      "api": {
+        "endpoints": [
+          {
+            "method": "GET",
+            "path": "/steps",
+            "purpose": "獲取所有步數記錄"
+          },
+          {
+            "method": "POST",
+            "path": "/steps",
+            "purpose": "創建新的步數記錄"
+          },
+          {
+            "method": "GET",
+            "path": "/steps/today",
+            "purpose": "獲取今天的步數記錄"
+          },
+          {
+            "method": "DELETE",
+            "path": "/steps/{id}",
+            "purpose": "刪除指定的步數記錄"
+          }
+        ],
+        "modules": [
+          {
+            "name": "step_api.py",
+            "purpose": "實現步數記錄的RESTful API功能，包含資料儲存和處理邏輯"
+          }
+        ]
+      },
+      "web": {
+        "modules": [
+          {
+            "name": "index.html",
+            "purpose": "提供主要的使用者介面，包含步數輸入表單和歷史記錄顯示"
+          },
+          {
+            "name": "app.js",
+            "purpose": "處理前端互動邏輯，包括表單提交、資料顯示和API通訊"
+          },
+          {
+            "name": "style.css",
+            "purpose": "定義網頁的樣式和排版"
+          }
+        ]
+      }
+    },
+    "notes": "應用程式資料將儲存在記憶體中，不使用外部資料庫。前端和後端之間透過HTTP API進行通訊。",
+    "steps": [
+      "建立前端靜態頁面，包含步數輸入表單和歷史記錄顯示區域",
+      "實現前端JavaScript互動功能，處理步數資料提交和顯示",
+      "建立Python API模組處理步數資料的增刪改查操作",
+      "設計API端點以支援步數記錄的創建、獲取和刪除",
+      "在Kubernetes中部署前端和後端組件",
+      "設定服務間通訊和負載均衡",
+      "測試應用程式的完整功能流程"
+    ],
+    "summary": "一個用來記錄每天步數的簡單網頁應用程式，包含前端介面和後端API。"
+  },
+  "schema": 1
+}
