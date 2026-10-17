@@ -1,0 +1,82 @@
+{
+  "app": "night-poll",
+  "archivedAt": "2026-10-17T05:53:48Z",
+  "openedAt": "2026-10-17T05:49:30Z",
+  "round": {
+    "app": "night-poll",
+    "confirmers": [],
+    "deadline": 1792217970,
+    "id": "r-20261017-051eaa",
+    "initiator": "laoban-cli-test",
+    "log": [
+      {
+        "args": {
+          "minutes": "30"
+        },
+        "at": "2026-10-17T05:49:30Z",
+        "by": "laoban-cli-test",
+        "code": "opened",
+        "event": "started a round (converges in 30 min)"
+      },
+      {
+        "args": {
+          "count": "1"
+        },
+        "at": "2026-10-17T05:49:30Z",
+        "by": "laoban-cli-test2",
+        "code": "opinion",
+        "event": "gave 1 opinion(s)"
+      },
+      {
+        "args": {
+          "count": "1"
+        },
+        "at": "2026-10-17T05:53:08Z",
+        "by": "u-pc66f",
+        "code": "opinion",
+        "event": "gave 1 opinion(s)"
+      },
+      {
+        "at": "2026-10-17T05:53:42Z",
+        "by": "laoban-cli-test",
+        "code": "cancelled",
+        "event": "cancelled this round"
+      }
+    ],
+    "message": "",
+    "opinions": [
+      {
+        "at": "2026-10-17T05:49:30Z",
+        "by": "laoban-cli-test",
+        "id": "o1",
+        "replies": [],
+        "supporters": [],
+        "text": "t23-13 A: make the vote buttons larger"
+      },
+      {
+        "at": "2026-10-17T05:49:30Z",
+        "by": "laoban-cli-test2",
+        "id": "o2",
+        "replies": [],
+        "supporters": [],
+        "text": "t23-13 B: add a footer note"
+      },
+      {
+        "at": "2026-10-17T05:53:08Z",
+        "by": "u-pc66f",
+        "id": "o3",
+        "replies": [],
+        "supporters": [],
+        "text": "t23-14 C user: test opinion"
+      }
+    ],
+    "plan": null,
+    "result": null,
+    "scope": [
+      "web"
+    ],
+    "state": "cancelled"
+  },
+  "schema": 1,
+  "targetNamespace": "laoban-dev"
+}
