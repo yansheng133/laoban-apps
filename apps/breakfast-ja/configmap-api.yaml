@@ -16,21 +16,23 @@ data:
     JST = timezone(timedelta(hours=9))
 
     MENU = [
-        {'id': 'crepe', 'name': '台湾風クレープ', 'price': 350},
-        {'id': 'radish', 'name': '大根餅', 'price': 400},
-        {'id': 'noodle', 'name': '鉄板麺', 'price': 550},
-        {'id': 'nugget', 'name': 'チキンナゲット', 'price': 450},
-        {'id': 'milktea', 'name': 'ミルクティー', 'price': 300},
-        {'id': 'soymilk', 'name': '豆乳', 'price': 250},
+        {'id': 'crepe', 'name': '台湾風クレープ', 'price': 350, 'sold_out': False},
+        {'id': 'radish', 'name': '大根餅', 'price': 400, 'sold_out': False},
+        {'id': 'noodle', 'name': '鉄板麺', 'price': 550, 'sold_out': False},
+        {'id': 'nugget', 'name': 'チキンナゲット', 'price': 450, 'sold_out': False},
+        {'id': 'milktea', 'name': 'ミルクティー', 'price': 300, 'sold_out': False},
+        {'id': 'soymilk', 'name': '豆乳', 'price': 250, 'sold_out': False},
     ]
     MENU_BY_ID = {m['id']: m for m in MENU}
 
     STATUSES = ['未着手', '調理中', '完了']
+    ORDER_TYPES = ['店内', '持ち帰り']
 
     _orders = []
     _next_id = 1
 
     ORDER_ID_RE = re.compile(r'^/orders/([0-9]+)$')
+    MENU_ID_RE = re.compile(r'^/menu/([A-Za-z0-9_-]+)$')
 
 
     def _now():
@@ -65,11 +67,26 @@ data:
         return {
             'id': order['id'],
             'table': order['table'],
+            'order_type': order['order_type'],
             'items': [dict(i) for i in order['items']],
             'total': order['total'],
             'status': order['status'],
             'created_at': order['created_at'],
         }
+
+
+    def _update_menu_item(item_id, body):
+        data, err = _parse_body(body)
+        if err:
+            return 400, {'error': err}
+        item = MENU_BY_ID.get(item_id)
+        if item is None:
+            return 404, {'error': '商品が見つかりません。'}
+        sold_out = data.get('sold_out')
+        if not isinstance(sold_out, bool):
+            return 400, {'error': '品切れ状態は true または false で指定してください。'}
+        item['sold_out'] = sold_out
+        return 200, {'item': dict(item)}
 
 
     def _create_order(body):
@@ -81,6 +98,10 @@ data:
         table = _to_int(data.get('table'))
         if table is None or table < 1 or table > 999:
             return 400, {'error': 'テーブル番号は1〜999の整数で指定してください。'}
+
+        order_type = data.get('order_type')
+        if not isinstance(order_type, str) or order_type not in ORDER_TYPES:
+            return 400, {'error': '注文区分は「店内」か「持ち帰り」で指定してください。'}
 
         items = data.get('items')
         if not isinstance(items, list) or not items:
@@ -106,6 +127,10 @@ data:
             if merged[item_id] > 99:
                 return 400, {'error': '同じ商品の数量は99までです。'}
 
+        for item_id in order_ids:
+            if MENU_BY_ID[item_id]['sold_out']:
+                return 409, {'error': '「' + MENU_BY_ID[item_id]['name'] + '」は品切れです。'}
+
         lines = []
         total = 0
         for item_id in order_ids:
@@ -123,6 +148,7 @@ data:
         order = {
             'id': _next_id,
             'table': table,
+            'order_type': order_type,
             'items': lines,
             'total': total,
             'status': STATUSES[0],
@@ -179,10 +205,24 @@ data:
     def _sales_today():
         today = _now().strftime('%Y-%m-%d')
         todays = [o for o in _orders if o['date'] == today]
+
+        counts = {}
+        for o in todays:
+            for it in o['items']:
+                counts[it['id']] = counts.get(it['id'], 0) + it['quantity']
+
+        ranking = []
+        for m in MENU:
+            if m['id'] in counts and counts[m['id']] > 0:
+                ranking.append({'id': m['id'], 'name': m['name'], 'quantity': counts[m['id']]})
+        # stable sort keeps menu order for ties
+        ranking.sort(key=lambda r: -r['quantity'])
+
         return 200, {
             'date': today,
             'order_count': len(todays),
             'total_sales': sum(o['total'] for o in todays),
+            'top_items': ranking[:3],
         }
 
 
@@ -203,6 +243,12 @@ data:
             if method != 'GET':
                 return 405, {'error': '許可されていないメソッドです。'}
             return 200, {'menu': [dict(m) for m in MENU]}
+
+        menu_match = MENU_ID_RE.match(path)
+        if menu_match:
+            if method != 'PATCH':
+                return 405, {'error': '許可されていないメソッドです。'}
+            return _update_menu_item(menu_match.group(1), body)
 
         if path == '/orders':
             if method == 'POST':

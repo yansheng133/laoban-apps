@@ -21,7 +21,7 @@ spec:
         app.kubernetes.io/name: "breakfast-ja-web"
         app.kubernetes.io/component: "web"
       annotations:
-        laoban.io/content-hash: "06d9e5bc2f5f51f3303273985ea1f14ba11bfdc8b3a8278a92b0bef380a1e9c0"
+        laoban.io/content-hash: "072a305742250da2304e18bfda9db7a1700a1d94fb66d64ea223ff7646b9b3d9"
     spec:
       automountServiceAccountToken: false
       securityContext:

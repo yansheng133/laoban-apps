@@ -15,6 +15,7 @@ data:
       var STATUS_NEXT = { '未着手': '調理中', '調理中': '完了' };
       var STATUS_BUTTON = { '未着手': '調理を開始', '調理中': '完了にする' };
       var STATUS_CLASS = { '未着手': 'status-todo', '調理中': 'status-doing', '完了': 'status-done' };
+      var TYPE_CLASS = { '店内': 'type-dine', '持ち帰り': 'type-take' };
       var REFRESH_MS = 5000;
 
       var menu = [];
@@ -65,7 +66,9 @@ data:
       /* ---------- order tab ---------- */
       function cartTotal() {
         var total = 0;
-        menu.forEach(function (m) { total += m.price * (quantities[m.id] || 0); });
+        menu.forEach(function (m) {
+          if (!m.sold_out) { total += m.price * (quantities[m.id] || 0); }
+        });
         return total;
       }
 
@@ -90,7 +93,7 @@ data:
         list.textContent = '';
         menu.forEach(function (m) {
           var li = document.createElement('li');
-          li.className = 'menu-item';
+          li.className = 'menu-item' + (m.sold_out ? ' sold-out' : '');
 
           var info = document.createElement('div');
           info.className = 'menu-info';
@@ -105,9 +108,16 @@ data:
 
           var ctl = document.createElement('div');
           ctl.className = 'qty-control';
+          if (m.sold_out) {
+            var tag = document.createElement('span');
+            tag.className = 'sold-out-tag';
+            tag.textContent = '品切れ';
+            ctl.appendChild(tag);
+          }
           var minus = document.createElement('button');
           minus.type = 'button';
           minus.textContent = '−';
+          minus.disabled = !!m.sold_out;
           minus.setAttribute('aria-label', m.name + 'を減らす');
           minus.addEventListener('click', function () { changeQty(m.id, -1); });
           var qty = document.createElement('span');
@@ -117,6 +127,7 @@ data:
           var plus = document.createElement('button');
           plus.type = 'button';
           plus.textContent = '+';
+          plus.disabled = !!m.sold_out;
           plus.setAttribute('aria-label', m.name + 'を増やす');
           plus.addEventListener('click', function () { changeQty(m.id, 1); });
           ctl.appendChild(minus);
@@ -130,15 +141,64 @@ data:
         updateCart();
       }
 
+      function renderStock() {
+        var list = $('stock-list');
+        list.textContent = '';
+        menu.forEach(function (m) {
+          var li = document.createElement('li');
+          li.className = 'stock-item' + (m.sold_out ? ' sold-out' : '');
+
+          var name = document.createElement('span');
+          name.className = 'stock-name';
+          name.textContent = m.name;
+
+          var state = document.createElement('span');
+          state.className = 'stock-state';
+          state.textContent = m.sold_out ? '品切れ' : '販売中';
+
+          var b = document.createElement('button');
+          b.type = 'button';
+          b.className = m.sold_out ? 'primary' : 'secondary';
+          b.textContent = m.sold_out ? '販売を再開' : '品切れにする';
+          b.addEventListener('click', function () { toggleSoldOut(m, b); });
+
+          li.appendChild(name);
+          li.appendChild(state);
+          li.appendChild(b);
+          list.appendChild(li);
+        });
+      }
+
       function loadMenu() {
         return api('menu').then(function (data) {
           menu = data.menu || [];
-          menu.forEach(function (m) { if (!(m.id in quantities)) { quantities[m.id] = 0; } });
+          menu.forEach(function (m) {
+            if (!(m.id in quantities) || m.sold_out) { quantities[m.id] = 0; }
+          });
           renderMenu();
-          setMessage('order-message', '', false);
+          renderStock();
         }).catch(function (e) {
           setMessage('order-message', 'メニューを読み込めませんでした: ' + e.message, true);
         });
+      }
+
+      function toggleSoldOut(m, btn) {
+        btn.disabled = true;
+        api('menu/' + m.id, { method: 'PATCH', body: { sold_out: !m.sold_out } }).then(function () {
+          setMessage('stock-message', '', false);
+          return loadMenu();
+        }).catch(function (e) {
+          setMessage('stock-message', '品切れ状態を更新できませんでした: ' + e.message, true);
+          btn.disabled = false;
+        });
+      }
+
+      function selectedOrderType() {
+        var radios = document.querySelectorAll('input[name=order-type]');
+        for (var i = 0; i < radios.length; i++) {
+          if (radios[i].checked) { return radios[i].value; }
+        }
+        return '';
       }
 
       function submitOrder() {
@@ -148,10 +208,15 @@ data:
           setMessage('order-message', 'テーブル番号を入力してください。', true);
           return;
         }
+        var orderType = selectedOrderType();
+        if (!orderType) {
+          setMessage('order-message', '「店内」か「持ち帰り」を選んでください。', true);
+          return;
+        }
         var items = [];
         menu.forEach(function (m) {
           var q = quantities[m.id] || 0;
-          if (q > 0) { items.push({ id: m.id, quantity: q }); }
+          if (q > 0 && !m.sold_out) { items.push({ id: m.id, quantity: q }); }
         });
         if (items.length === 0) {
           setMessage('order-message', '商品を1つ以上選んでください。', true);
@@ -159,13 +224,14 @@ data:
         }
         var btn = $('submit-order');
         btn.disabled = true;
-        api('orders', { method: 'POST', body: { table: table, items: items } }).then(function (data) {
+        api('orders', { method: 'POST', body: { table: table, order_type: orderType, items: items } }).then(function (data) {
           var o = data.order;
-          setMessage('order-message', '注文を受け付けました(注文番号 ' + o.id + '、合計 ' + yen(o.total) + ')。', false);
+          setMessage('order-message', '注文を受け付けました(注文番号 ' + o.id + '、' + o.order_type + '、合計 ' + yen(o.total) + ')。', false);
           menu.forEach(function (m) { quantities[m.id] = 0; });
           updateCart();
         }).catch(function (e) {
           setMessage('order-message', '注文を送信できませんでした: ' + e.message, true);
+          loadMenu();
         }).then(function () {
           btn.disabled = false;
         });
@@ -198,7 +264,11 @@ data:
           head.className = 'order-head';
           var title = document.createElement('span');
           title.className = 'order-title';
-          title.textContent = '注文 #' + o.id + ' / テーブル ' + o.table;
+          title.textContent = '注文 #' + o.id + ' / テーブル ' + o.table + ' ';
+          var typeLabel = document.createElement('span');
+          typeLabel.className = 'type-label ' + (TYPE_CLASS[o.order_type] || '');
+          typeLabel.textContent = o.order_type || '';
+          title.appendChild(typeLabel);
           var badge = document.createElement('span');
           badge.className = 'badge';
           badge.textContent = o.status;
@@ -265,11 +335,41 @@ data:
       }
 
       /* ---------- sales tab ---------- */
+      function renderTopItems(items) {
+        var list = $('top-items');
+        list.textContent = '';
+        if (!items || items.length === 0) {
+          var empty = document.createElement('li');
+          empty.className = 'empty';
+          empty.textContent = 'まだ販売がありません。';
+          list.appendChild(empty);
+          return;
+        }
+        items.forEach(function (it, idx) {
+          var li = document.createElement('li');
+          li.className = 'top-item rank-' + (idx + 1);
+          var rank = document.createElement('span');
+          rank.className = 'rank';
+          rank.textContent = (idx + 1) + '位';
+          var name = document.createElement('span');
+          name.className = 'top-name';
+          name.textContent = it.name;
+          var count = document.createElement('span');
+          count.className = 'top-count';
+          count.textContent = it.quantity + '個';
+          li.appendChild(rank);
+          li.appendChild(name);
+          li.appendChild(count);
+          list.appendChild(li);
+        });
+      }
+
       function loadSales() {
         return api('sales/today').then(function (data) {
           $('sales-count').textContent = data.order_count + '件';
           $('sales-total').textContent = yen(data.total_sales);
           $('sales-date').textContent = data.date ? '対象日: ' + data.date + '(日本時間)' : '';
+          renderTopItems(data.top_items);
           setMessage('sales-message', '', false);
         }).catch(function (e) {
           setMessage('sales-message', '売上を読み込めませんでした: ' + e.message, true);
@@ -278,8 +378,9 @@ data:
 
       /* ---------- refresh ---------- */
       function refresh() {
-        if (currentTab === 'kitchen') { loadOrders(); }
+        if (currentTab === 'kitchen') { loadOrders(); loadMenu(); }
         else if (currentTab === 'sales') { loadSales(); }
+        else { loadMenu(); }
       }
 
       function init() {
@@ -322,6 +423,11 @@ data:
     <div class='order-form'>
     <label for='table-no'>テーブル番号</label>
     <input id='table-no' type='number' min='1' max='999' inputmode='numeric' placeholder='例: 3'>
+    <fieldset class='order-type'>
+    <legend>注文区分</legend>
+    <label class='radio-label'><input type='radio' name='order-type' value='店内' checked> 店内</label>
+    <label class='radio-label'><input type='radio' name='order-type' value='持ち帰り'> 持ち帰り</label>
+    </fieldset>
     <p class='cart-total'>合計: <strong id='cart-total'>0円</strong></p>
     <button type='button' id='submit-order' class='primary'>注文を送信</button>
     <p id='order-message' class='message' role='status'></p>
@@ -340,6 +446,10 @@ data:
     </div>
     <p id='kitchen-message' class='message' role='status'></p>
     <ul id='order-list' class='order-list'></ul>
+    <h2 class='section-title'>品切れ設定</h2>
+    <p class='note'>品切れにした商品は注文ページで選べなくなります。</p>
+    <ul id='stock-list' class='stock-list'></ul>
+    <p id='stock-message' class='message' role='status'></p>
     </section>
     <section id='tab-sales' class='panel'>
     <h2>今日の売上</h2>
@@ -348,6 +458,8 @@ data:
     <div class='card'><span class='card-label'>売上合計</span><span id='sales-total' class='card-value'>-</span></div>
     </div>
     <p id='sales-date' class='note'></p>
+    <h2 class='section-title'>今日の売れ筋トップ3</h2>
+    <ol id='top-items' class='top-items'></ol>
     <p id='sales-message' class='message' role='status'></p>
     </section>
     </main>
@@ -543,6 +655,7 @@ data:
     .panel.active { display: block; }
 
     h2 { margin-top: 0; font-size: 1.2rem; }
+    h2.section-title { margin-top: 28px; }
 
     button {
       font-family: inherit;
@@ -563,7 +676,15 @@ data:
       padding: 10px 18px;
     }
 
-    .menu-list, .order-list, .order-items {
+    button.secondary {
+      background: #fff;
+      color: #c8531d;
+      border: 1px solid #c8531d;
+      border-radius: 8px;
+      padding: 8px 16px;
+    }
+
+    .menu-list, .order-list, .order-items, .stock-list, .top-items {
       list-style: none;
       margin: 0;
       padding: 0;
@@ -578,6 +699,24 @@ data:
       border-radius: 10px;
       padding: 10px 14px;
       margin-bottom: 8px;
+    }
+
+    .menu-item.sold-out {
+      background: #ececec;
+      border-color: #d4d4d4;
+      color: #8a8a8a;
+    }
+
+    .menu-item.sold-out .menu-price { color: #9a9a9a; }
+    .menu-item.sold-out .menu-name { text-decoration: line-through; }
+
+    .sold-out-tag {
+      background: #777;
+      color: #fff;
+      border-radius: 999px;
+      padding: 2px 10px;
+      font-size: 0.85rem;
+      white-space: nowrap;
     }
 
     .menu-info { display: flex; flex-direction: column; }
@@ -601,6 +740,12 @@ data:
       line-height: 1;
     }
 
+    .menu-item.sold-out .qty-control button {
+      border-color: #aaa;
+      color: #aaa;
+      background: #f4f4f4;
+    }
+
     .qty {
       min-width: 28px;
       text-align: center;
@@ -620,6 +765,25 @@ data:
       display: block;
       font-weight: bold;
       margin-bottom: 4px;
+    }
+
+    .order-type {
+      border: none;
+      margin: 12px 0 0;
+      padding: 0;
+    }
+
+    .order-type legend {
+      font-weight: bold;
+      padding: 0;
+      margin-bottom: 4px;
+    }
+
+    .order-form .radio-label {
+      display: inline-block;
+      font-weight: normal;
+      margin-right: 18px;
+      cursor: pointer;
     }
 
     input[type='number'], select {
@@ -662,6 +826,20 @@ data:
 
     .order-title { font-weight: bold; }
 
+    .type-label {
+      display: inline-block;
+      margin-left: 4px;
+      padding: 1px 10px;
+      border-radius: 4px;
+      font-size: 0.85rem;
+      font-weight: bold;
+      color: #fff;
+      vertical-align: middle;
+    }
+
+    .type-label.type-dine { background: #1c6ea4; }
+    .type-label.type-take { background: #7b3fa0; }
+
     .badge {
       padding: 2px 12px;
       border-radius: 999px;
@@ -690,6 +868,27 @@ data:
 
     .empty { color: #777; padding: 12px 0; }
 
+    .stock-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      background: #fff;
+      border: 1px solid #e6dccb;
+      border-radius: 10px;
+      padding: 10px 14px;
+      margin-bottom: 8px;
+    }
+
+    .stock-item.sold-out {
+      background: #ececec;
+      border-color: #d4d4d4;
+      color: #8a8a8a;
+    }
+
+    .stock-name { flex: 1; font-weight: bold; }
+    .stock-state { font-size: 0.9rem; color: #1b7a2f; }
+    .stock-item.sold-out .stock-state { color: #777; }
+
     .sales-cards {
       display: flex;
       gap: 12px;
@@ -711,3 +910,29 @@ data:
     .card-value { font-size: 2rem; font-weight: bold; color: #c8531d; }
 
     .note { color: #666; font-size: 0.9rem; }
+
+    .top-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      background: #fff;
+      border: 1px solid #e6dccb;
+      border-radius: 10px;
+      padding: 10px 14px;
+      margin-bottom: 8px;
+    }
+
+    .top-item .rank {
+      min-width: 44px;
+      font-weight: bold;
+      font-size: 1.1rem;
+      color: #c8531d;
+    }
+
+    .top-item.rank-1 { background: #fff6e0; border-color: #f0c869; }
+    .top-item.rank-1 .rank { color: #b07800; font-size: 1.3rem; }
+    .top-item.rank-2 .rank { color: #6b6b6b; }
+    .top-item.rank-3 .rank { color: #9a5b2c; }
+
+    .top-name { flex: 1; font-weight: bold; }
+    .top-count { font-weight: bold; color: #444; }
