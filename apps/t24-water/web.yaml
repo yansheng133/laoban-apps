@@ -21,7 +21,7 @@ spec:
         app.kubernetes.io/name: "t24-water-web"
         app.kubernetes.io/component: "web"
       annotations:
-        laoban.io/content-hash: "68cecd87fa6d1e19034c21b3a9bc7b49b5d6ee6a2f0cf41d6862aea1c22b84d4"
+        laoban.io/content-hash: "c3ec31085052b5338651f6c3d30e4b76f8912fdf58ae9e458c946119afd8f72e"
     spec:
       automountServiceAccountToken: false
       securityContext:
