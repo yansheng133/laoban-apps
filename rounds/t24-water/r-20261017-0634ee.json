@@ -1,0 +1,49 @@
+{
+  "app": "t24-water",
+  "archivedAt": "2026-10-17T07:04:10Z",
+  "openedAt": "2026-10-17T07:03:42Z",
+  "round": {
+    "app": "t24-water",
+    "confirmers": [],
+    "deadline": 1792221222,
+    "id": "r-20261017-0634ee",
+    "initiator": "user-kgw7z",
+    "log": [
+      {
+        "args": {
+          "minutes": "10"
+        },
+        "at": "2026-10-17T07:03:42Z",
+        "by": "user-kgw7z",
+        "code": "opened",
+        "event": "started a round (converges in 10 min)"
+      },
+      {
+        "at": "2026-10-17T07:04:03Z",
+        "by": "user-kgw7z",
+        "code": "cancelled",
+        "event": "cancelled this round"
+      }
+    ],
+    "message": "",
+    "opinions": [
+      {
+        "at": "2026-10-17T07:03:42Z",
+        "by": "user-kgw7z",
+        "id": "o1",
+        "replies": [],
+        "supporters": [],
+        "text": "t24-17 Sam: make the add button green"
+      }
+    ],
+    "plan": null,
+    "result": null,
+    "scope": [
+      "web",
+      "api"
+    ],
+    "state": "cancelled"
+  },
+  "schema": 1,
+  "targetNamespace": "laoban-dev"
+}
