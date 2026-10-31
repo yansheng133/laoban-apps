@@ -26,8 +26,22 @@
       "model": "qwen3-coder:30b",
       "request": "（user-kgw7z）［demo-board-web］留言要能依讚數排序",
       "summary": "建立一個團隊留言板，使用者可以發佈留言、對留言按讚以及刪除自己的留言，留言會依照時間順序顯示，最新的在最上面。新增功能可依讚數排序留言。"
+    },
+    {
+      "at": "2026-10-31T00:28:35Z",
+      "by": "laoban-cli-test",
+      "kind": "layout",
+      "model": "",
+      "request": "Rearranged the 3D layout",
+      "summary": "建立一個團隊留言板，使用者可以發佈留言、對留言按讚以及刪除自己的留言，留言會依照時間順序顯示，最新的在最上面。新增功能可依讚數排序留言。"
     }
   ],
+  "layout": {
+    "svc-web": {
+      "x": -2.5,
+      "z": -2.0
+    }
+  },
   "plan": {
     "appName": "demo-board",
     "components": {
