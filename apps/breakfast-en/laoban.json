@@ -26,8 +26,22 @@
       "model": "claude-sonnet-5-5",
       "request": "(m-vvk9f) When ordering, customers should choose \"Dine in\" or \"Take out\", and the kitchen board should show it.; (laoban-cli-test) [breakfast-en-web] The kitchen should be able to mark an item as sold out; sold-out items turn grey on the order page and cannot be picked.; (laoban-cli-test2) [breakfast-en-api] Add today's top three items to the Sales tab.",
       "summary": "A breakfast shop ordering system with three tabs. On the Order tab, customers choose menu items, adjust quantities, enter a table number, pick Dine in or Take out, and send the order. Sold-out items appear grey and cannot be picked. The Kitchen tab lists orders by time with a Dine in / Take out label. Staff can move each order from To do to Cooking to Done, and can mark menu items as sold out or available again. The Sales tab shows today's order count, total sales and the top three items sold. The static web front end talks to a Python standard-library JSON API that keeps all data in memory."
+    },
+    {
+      "at": "2026-10-31T00:28:07Z",
+      "by": "laoban-cli-test",
+      "kind": "layout",
+      "model": "",
+      "request": "Rearranged the 3D layout",
+      "summary": "A breakfast shop ordering system with three tabs. On the Order tab, customers choose menu items, adjust quantities, enter a table number, pick Dine in or Take out, and send the order. Sold-out items appear grey and cannot be picked. The Kitchen tab lists orders by time with a Dine in / Take out label. Staff can move each order from To do to Cooking to Done, and can mark menu items as sold out or available again. The Sales tab shows today's order count, total sales and the top three items sold. The static web front end talks to a Python standard-library JSON API that keeps all data in memory."
     }
   ],
+  "layout": {
+    "svc-web": {
+      "x": -2.5,
+      "z": -2.0
+    }
+  },
   "plan": {
     "appName": "breakfast-en",
     "components": {
