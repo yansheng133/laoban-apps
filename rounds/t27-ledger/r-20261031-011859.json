@@ -1,0 +1,49 @@
+{
+  "app": "t27-ledger",
+  "archivedAt": "2026-10-31T01:14:49Z",
+  "openedAt": "2026-10-31T01:14:45Z",
+  "round": {
+    "app": "t27-ledger",
+    "confirmers": [],
+    "deadline": 1793411085,
+    "id": "r-20261031-011859",
+    "initiator": "laoban-cli-test",
+    "log": [
+      {
+        "args": {
+          "minutes": "30"
+        },
+        "at": "2026-10-31T01:14:45Z",
+        "by": "laoban-cli-test",
+        "code": "opened",
+        "event": "started a round (converges in 30 min)"
+      },
+      {
+        "at": "2026-10-31T01:14:45Z",
+        "by": "laoban-cli-test",
+        "code": "cancelled",
+        "event": "cancelled this round"
+      }
+    ],
+    "message": "",
+    "opinions": [
+      {
+        "at": "2026-10-31T01:14:45Z",
+        "by": "laoban-cli-test",
+        "id": "o1",
+        "replies": [],
+        "supporters": [],
+        "text": "t27 測試用，會取消"
+      }
+    ],
+    "plan": null,
+    "result": null,
+    "scope": [
+      "web",
+      "api"
+    ],
+    "state": "cancelled"
+  },
+  "schema": 1,
+  "targetNamespace": "laoban-dev"
+}
