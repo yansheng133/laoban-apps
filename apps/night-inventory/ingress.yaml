@@ -7,8 +7,6 @@ metadata:
     laoban.io/app: "night-inventory"
     app.kubernetes.io/name: "night-inventory-web"
     app.kubernetes.io/component: "web"
-  annotations:
-    "traefik.ingress.kubernetes.io/router.middlewares": "laoban-dev-laoban-test-deny@kubernetescrd"
 spec:
   ingressClassName: "traefik"
   rules:
