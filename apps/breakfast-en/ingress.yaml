@@ -7,6 +7,8 @@ metadata:
     laoban.io/app: "breakfast-en"
     app.kubernetes.io/name: "breakfast-en-web"
     app.kubernetes.io/component: "web"
+  annotations:
+    "traefik.ingress.kubernetes.io/router.middlewares": "laoban-dev-laoban-test-deny@kubernetescrd"
 spec:
   ingressClassName: "traefik"
   rules:

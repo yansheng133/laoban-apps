@@ -7,6 +7,8 @@ metadata:
     laoban.io/app: "night-memo"
     app.kubernetes.io/name: "night-memo-web"
     app.kubernetes.io/component: "web"
+  annotations:
+    "traefik.ingress.kubernetes.io/router.middlewares": "laoban-dev-laoban-test-deny@kubernetescrd"
 spec:
   ingressClassName: "traefik"
   rules:
