@@ -1,0 +1,22 @@
+# Added by hand (B25): this app predates laoban.json, so laoban cannot regenerate it.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: "breakfast-order-web"
+  labels:
+    laoban.io/app: "breakfast-order"
+    app.kubernetes.io/name: "breakfast-order-web"
+    app.kubernetes.io/component: "web"
+spec:
+  ingressClassName: "traefik"
+  rules:
+    - host: "breakfast-order.apps.localhost"
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: "breakfast-order-web"
+                port:
+                  name: http
