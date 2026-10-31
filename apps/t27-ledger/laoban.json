@@ -1,0 +1,82 @@
+{
+  "appName": "t27-ledger",
+  "files": {
+    "api": {
+      "handler.py": "import json\n\ntx_storage = []\n\ndef handle(method, path, body):\n    if method == \"POST\" and path == \"/transactions\":\n        data = json.loads(body.decode())\n        tx_storage.append(data)\n        return (201, {\"message\": \"交易記錄已新增\"})\n    \n    elif method == \"GET\" and path == \"/transactions\":\n        return (200, tx_storage)\n    \n    elif method == \"GET\" and path == \"/balance\":\n        balance = 0\n        for tx in tx_storage:\n            if tx[\"type\"] == \"income\":\n                balance += tx[\"amount\"]\n            else:\n                balance -= tx[\"amount\"]\n        return (200, {\"balance\": balance})\n    \n    else:\n        return (404, {\"error\": \"找不到資源\"})"
+    },
+    "web": {
+      "app.js": "document.addEventListener('DOMContentLoaded', () => {\n    const form = document.getElementById('transactionForm');\n    const transactionList = document.getElementById('transactionList');\n    const balanceAmount = document.getElementById('balanceAmount');\n\n    // 載入交易記錄和餘額\n    loadTransactions();\n    loadBalance();\n\n    // 處理表單提交\n    form.addEventListener('submit', async (e) => {\n        e.preventDefault();\n        \n        const description = document.getElementById('description').value;\n        const amount = parseFloat(document.getElementById('amount').value);\n        const type = document.getElementById('type').value;\n        \n        try {\n            // 呼叫API新增交易\n            await fetch('api/transactions', {\n                method: 'POST',\n                headers: {\n                    'Content-Type': 'application/json'\n                },\n                body: JSON.stringify({ description, amount, type })\n            });\n            \n            // 重新載入資料\n            loadTransactions();\n            loadBalance();\n            \n            // 清空表單\n            form.reset();\n        } catch (error) {\n            console.error('新增交易失敗:', error);\n            alert('新增交易失敗');\n        }\n    });\n\n    // 載入交易記錄\n    async function loadTransactions() {\n        try {\n            const response = await fetch('api/transactions');\n            const transactions = await response.json();\n            \n            transactionList.innerHTML = '';\n            \n            if (transactions.length === 0) {\n                transactionList.innerHTML = '<li>沒有交易記錄</li>';\n                return;\n            }\n            \n            transactions.forEach(transaction => {\n                const li = document.createElement('li');\n                li.textContent = `${transaction.description} - ${transaction.type === 'income' ? '+' : '-'}${transaction.amount}`;\n                transactionList.appendChild(li);\n            });\n        } catch (error) {\n            console.error('載入交易記錄失敗:', error);\n            transactionList.innerHTML = '<li>載入交易記錄失敗</li>';\n        }\n    }\n\n    // 載入餘額\n    async function loadBalance() {\n        try {\n            const response = await fetch('api/balance');\n            const data = await response.json();\n            balanceAmount.textContent = data.balance.toFixed(2);\n        } catch (error) {\n            console.error('載入餘額失敗:', error);\n            balanceAmount.textContent = '錯誤';\n        }\n    }\n});",
+      "index.html": "<!DOCTYPE html>\n<html lang=\"zh-TW\">\n<head>\n    <meta charset=\"UTF-8\">\n    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n    <title>t27-ledger 記帳本</title>\n    <link rel=\"stylesheet\" href=\"style.css\">\n</head>\n<body>\n    <div class=\"container\">\n        <h1>t27-ledger 記帳本</h1>\n        \n        <form id=\"transactionForm\">\n            <h2>新增交易記錄</h2>\n            <label for=\"description\">描述:</label>\n            <input type=\"text\" id=\"description\" required>\n            \n            <label for=\"amount\">金額:</label>\n            <input type=\"number\" id=\"amount\" step=\"0.01\" required>\n            \n            <label for=\"type\">類型:</label>\n            <select id=\"type\" required>\n                <option value=\"income\">收入</option>\n                <option value=\"expense\">支出</option>\n            </select>\n            \n            <button type=\"submit\">新增記錄</button>\n        </form>\n        \n        <div id=\"balance\">\n            <h2>目前餘額: <span id=\"balanceAmount\">0.00</span></h2>\n        </div>\n        \n        <div id=\"transactions\">\n            <h2>交易記錄</h2>\n            <ul id=\"transactionList\"></ul>\n        </div>\n    </div>\n    \n    <script src=\"app.js\"></script>\n</body>\n</html>",
+      "style.css": "body {\n    font-family: Arial, sans-serif;\n    margin: 0;\n    padding: 20px;\n    background-color: #f5f5f5;\n}\n\n.container {\n    max-width: 600px;\n    margin: 0 auto;\n    background-color: white;\n    padding: 20px;\n    border-radius: 8px;\n    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);\n}\n\nh1 {\n    text-align: center;\n    color: #333;\n}\n\nh2 {\n    color: #555;\n    border-bottom: 1px solid #eee;\n    padding-bottom: 5px;\n}\n\nform {\n    margin-bottom: 20px;\n}\n\nlabel {\n    display: block;\n    margin-top: 10px;\n    font-weight: bold;\n    color: #444;\n}\n\ninput, select {\n    width: 100%;\n    padding: 8px;\n    margin-top: 5px;\n    border: 1px solid #ddd;\n    border-radius: 4px;\n    box-sizing: border-box;\n}\n\nbutton {\n    width: 100%;\n    padding: 10px;\n    background-color: #007bff;\n    color: white;\n    border: none;\n    border-radius: 4px;\n    cursor: pointer;\n    margin-top: 10px;\n    font-size: 16px;\n}\n\nbutton:hover {\n    background-color: #0056b3;\n}\n\n#balanceAmount {\n    font-weight: bold;\n    color: #28a745;\n}\n\n#transactionList li {\n    padding: 8px;\n    border-bottom: 1px solid #eee;\n    list-style-type: none;\n}\n\n#transactionList li:last-child {\n    border-bottom: none;\n}"
+    }
+  },
+  "history": [
+    {
+      "at": "2026-10-31T01:13:06Z",
+      "by": "laoban-cli-test",
+      "kind": "create",
+      "model": "qwen3-coder:30b",
+      "request": "做一個簡單的記帳本：可以新增一筆收入或支出（金額、說明），列出所有紀錄，並顯示目前餘額",
+      "summary": "一個簡單的記帳本應用程式，允許使用者新增收入或支出記錄，查看所有交易紀錄，並即時顯示目前餘額。"
+    }
+  ],
+  "plan": {
+    "appName": "t27-ledger",
+    "components": {
+      "api": {
+        "endpoints": [
+          {
+            "method": "POST",
+            "path": "/transactions",
+            "purpose": "新增一筆收入或支出記錄"
+          },
+          {
+            "method": "GET",
+            "path": "/transactions",
+            "purpose": "取得所有交易紀錄列表"
+          },
+          {
+            "method": "GET",
+            "path": "/balance",
+            "purpose": "計算並返回目前帳戶餘額"
+          }
+        ],
+        "modules": [
+          {
+            "name": "transactions",
+            "purpose": "管理所有交易紀錄的儲存、查詢和計算功能"
+          }
+        ]
+      },
+      "web": {
+        "modules": [
+          {
+            "name": "ui-renderer",
+            "purpose": "負責渲染前端使用者介面，包括輸入表單和交易列表顯示"
+          },
+          {
+            "name": "form-handler",
+            "purpose": "處理使用者輸入表單的提交事件並呼叫API"
+          },
+          {
+            "name": "data-display",
+            "purpose": "顯示所有交易紀錄和目前餘額"
+          }
+        ]
+      }
+    },
+    "notes": "此應用程式使用記憶體儲存資料，因此在服務重啟後資料會遺失。前端介面設計為簡單直觀，方便使用者快速上手操作。",
+    "steps": [
+      "建立前端靜態網頁，包含輸入表單和紀錄列表顯示區域",
+      "設計API模組處理交易紀錄的新增、查詢和計算餘額功能",
+      "實現前端JavaScript程式碼以互動方式操作API",
+      "設定後端Python API模組，儲存交易資料在記憶體中",
+      "開發前端HTML與CSS樣式，建立美觀易用的使用者介面",
+      "連結前端與後端API，讓使用者操作可以即時更新資料",
+      "測試所有功能是否正常運作，包括新增、顯示和計算餘額",
+      "部署應用程式到Rancher管理的Kubernetes叢集中"
+    ],
+    "summary": "一個簡單的記帳本應用程式，允許使用者新增收入或支出記錄，查看所有交易紀錄，並即時顯示目前餘額。"
+  },
+  "schema": 1
+}
