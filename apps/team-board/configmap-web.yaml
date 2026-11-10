@@ -8,8 +8,201 @@ metadata:
     app.kubernetes.io/name: "team-board-web"
     app.kubernetes.io/component: "web"
 data:
-  app.js: "document.addEventListener('DOMContentLoaded', () => {\n    const messageForm = document.getElementById('messageForm');\n    const messageInput = document.getElementById('messageInput');\n    const messagesContainer = document.getElementById('messagesContainer');\n    const sortByTimeBtn = document.getElementById('sortByTime');\n    const sortByLikesBtn = document.getElementById('sortByLikes');\n\n    let currentSort = 'time'; // 'time' or 'likes'\n\n    // 顯示留言列表\n    async function loadMessages(sortBy = 'time') {\n        try {\n            const endpoint = sortBy === 'likes' ? 'messages/sort/likes' : 'messages';\n            const response = await fetch(`api/${endpoint}`);\n            const messages = await response.json();\n            displayMessages(messages, sortBy);\n        } catch (error) {\n            console.error('載入留言失敗:', error);\n        }\n    }\n\n    // 顯示留言\n    function displayMessages(messages, sortBy) {\n        messagesContainer.innerHTML = '';\n        \n        if (messages.length === 0) {\n            messagesContainer.innerHTML = '<p>目前沒有留言。</p>';\n            return;\n        }\n\n        if (sortBy === 'time') {\n            // 按時間排序（最新的在前）\n            messages.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));\n        } else {\n            // 按讚數排序（最多的在前）\n            messages.sort((a, b) => b.likes - a.likes);\n        }\n        \n        messages.forEach(msg => {\n            const messageElement = document.createElement('div');\n            messageElement.className = 'message';\n            messageElement.innerHTML = `\n                <p>${msg.content}</p>\n                <div class=\"message-info\">\n                    <span>時間: ${new Date(msg.timestamp).toLocaleString('zh-TW')}</span>\n                    <span>按讚: ${msg.likes}</span>\n                    <button class=\"like-btn\" data-id=\"${msg.id}\">按讚</button>\n                    <button class=\"delete-btn\" data-id=\"${msg.id}\">刪除</button>\n                </div>\n            `;\n            messagesContainer.appendChild(messageElement);\n        });\n\n        // 綁定按讚和刪除按鈕事件\n        document.querySelectorAll('.like-btn').forEach(btn => {\n            btn.addEventListener('click', async (e) => {\n                const id = e.target.dataset.id;\n                await likeMessage(id);\n            });\n        });\n\n        document.querySelectorAll('.delete-btn').forEach(btn => {\n            btn.addEventListener('click', async (e) => {\n                const id = e.target.dataset.id;\n                await deleteMessage(id);\n            });\n        });\n    }\n\n    // 發表留言\n    messageForm.addEventListener('submit', async (e) => {\n        e.preventDefault();\n        \n        if (!messageInput.value.trim()) return;\n        \n        try {\n            const content = messageInput.value.trim();\n            await fetch('api/messages', {\n                method: 'POST',\n                headers: { 'Content-Type': 'application/json' },\n                body: JSON.stringify({ content })\n            });\n            \n            messageInput.value = '';\n            await loadMessages(currentSort); // 重新載入留言\n        } catch (error) {\n            console.error('發表留言失敗:', error);\n        }\n    });\n\n    // 按讚\n    async function likeMessage(id) {\n        try {\n            await fetch(`api/messages/${id}/like`, { method: 'PUT' });\n            await loadMessages(currentSort); // 重新載入留言\n        } catch (error) {\n            console.error('按讚失敗:', error);\n        }\n    }\n\n    // 刪除留言\n    async function deleteMessage(id) {\n        try {\n            if (!confirm('確定要刪除這則留言嗎？')) return;\n            \n            await fetch(`api/messages/${id}`, { method: 'DELETE' });\n            await loadMessages(currentSort); // 重新載入留言\n        } catch (error) {\n            console.error('刪除留言失敗:', error);\n        }\n    }\n\n    // 切換排序方式\n    sortByTimeBtn.addEventListener('click', () => {\n        currentSort = 'time';\n        loadMessages(currentSort);\n    });\n\n    sortByLikesBtn.addEventListener('click', () => {\n        currentSort = 'likes';\n        loadMessages(currentSort);\n    });\n\n    // 初始化載入留言\n    loadMessages();\n});"
-  index.html: "<!DOCTYPE html>\n<html lang=\"zh-TW\">\n<head>\n    <meta charset=\"UTF-8\">\n    <title>團隊留言板</title>\n    <link rel=\"stylesheet\" href=\"style.css\">\n</head>\n<body>\n    <div class=\"container\">\n        <h1>團隊留言板</h1>\n        \n        <!-- 新增留言表單 -->\n        <form id=\"messageForm\">\n            <textarea id=\"messageInput\" placeholder=\"輸入您的留言...\" required></textarea>\n            <button type=\"submit\">發表留言</button>\n        </form>\n        \n        <!-- 排序按鈕 -->\n        <div class=\"sort-buttons\">\n            <button id=\"sortByTime\">依時間排序</button>\n            <button id=\"sortByLikes\">依讚數排序</button>\n        </div>\n        \n        <!-- 留言列表 -->\n        <div id=\"messagesContainer\"></div>\n    </div>\n    \n    <script src=\"app.js\"></script>\n</body>\n</html>"
+  app.js: |
+    document.addEventListener('DOMContentLoaded', () => {
+        const messageForm = document.getElementById('messageForm');
+        const authorInput = document.getElementById('authorInput');
+        const messageInput = document.getElementById('messageInput');
+        const messagesContainer = document.getElementById('messagesContainer');
+        const sortByTimeBtn = document.getElementById('sortByTime');
+        const sortByLikesBtn = document.getElementById('sortByLikes');
+        const errorBox = document.getElementById('errorBox');
+
+        let currentSort = 'time'; // 'time' 或 'likes'
+
+        function showError(message) {
+            errorBox.textContent = message;
+            errorBox.hidden = false;
+        }
+
+        function clearError() {
+            errorBox.textContent = '';
+            errorBox.hidden = true;
+        }
+
+        // 等待 fetch 的結果並解析 JSON；失敗時丟出含有錯誤訊息的 Error
+        async function readResponse(requestPromise) {
+            let response;
+            try {
+                response = await requestPromise;
+            } catch (err) {
+                throw new Error('無法連線到伺服器，請稍後再試。');
+            }
+            let data = null;
+            try {
+                data = await response.json();
+            } catch (err) {
+                data = null;
+            }
+            if (!response.ok) {
+                const detail = data && data.error ? data.error : '請求失敗（狀態碼 ' + response.status + '）';
+                throw new Error(detail);
+            }
+            return data;
+        }
+
+        // 載入留言列表
+        async function loadMessages() {
+            try {
+                let data;
+                if (currentSort === 'likes') {
+                    data = await readResponse(fetch('api/messages/sort/likes', { method: 'GET' }));
+                } else {
+                    data = await readResponse(fetch('api/messages', { method: 'GET' }));
+                }
+                const items = data && Array.isArray(data.items) ? data.items : [];
+                displayMessages(items);
+            } catch (error) {
+                showError('載入留言失敗：' + error.message);
+            }
+        }
+
+        function formatTime(value) {
+            const d = new Date(value);
+            if (isNaN(d.getTime())) return String(value || '');
+            return d.toLocaleString('zh-TW');
+        }
+
+        // 顯示留言
+        function displayMessages(messages) {
+            messagesContainer.textContent = '';
+
+            if (messages.length === 0) {
+                const empty = document.createElement('p');
+                empty.textContent = '目前沒有留言。';
+                messagesContainer.appendChild(empty);
+                return;
+            }
+
+            messages.forEach(msg => {
+                const messageElement = document.createElement('div');
+                messageElement.className = 'message';
+
+                const text = document.createElement('p');
+                text.textContent = msg.text;
+                messageElement.appendChild(text);
+
+                const info = document.createElement('div');
+                info.className = 'message-info';
+
+                const author = document.createElement('span');
+                author.textContent = '作者: ' + msg.author;
+                info.appendChild(author);
+
+                const time = document.createElement('span');
+                time.textContent = '時間: ' + formatTime(msg.created_at);
+                info.appendChild(time);
+
+                const likes = document.createElement('span');
+                likes.textContent = '按讚: ' + msg.likes;
+                info.appendChild(likes);
+
+                const likeBtn = document.createElement('button');
+                likeBtn.type = 'button';
+                likeBtn.className = 'like-btn';
+                likeBtn.dataset.id = msg.id;
+                likeBtn.textContent = '按讚';
+                info.appendChild(likeBtn);
+
+                const deleteBtn = document.createElement('button');
+                deleteBtn.type = 'button';
+                deleteBtn.className = 'delete-btn';
+                deleteBtn.dataset.id = msg.id;
+                deleteBtn.textContent = '刪除';
+                info.appendChild(deleteBtn);
+
+                messageElement.appendChild(info);
+                messagesContainer.appendChild(messageElement);
+            });
+        }
+
+        // 按讚與刪除按鈕（事件委派）
+        messagesContainer.addEventListener('click', async (e) => {
+            const btn = e.target.closest('button');
+            if (!btn || !btn.dataset.id) return;
+            const id = btn.dataset.id;
+            if (btn.classList.contains('like-btn')) {
+                await likeMessage(id);
+            } else if (btn.classList.contains('delete-btn')) {
+                await deleteMessage(id);
+            }
+        });
+
+        // 發表留言
+        messageForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const author = authorInput.value.trim();
+            const text = messageInput.value.trim();
+            if (!author || !text) {
+                showError('請輸入名字與留言內容。');
+                return;
+            }
+
+            try {
+                await readResponse(fetch('api/messages', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ author: author, text: text })
+                }));
+                clearError();
+                messageInput.value = '';
+                await loadMessages();
+            } catch (error) {
+                showError('發表留言失敗：' + error.message);
+            }
+        });
+
+        // 按讚
+        async function likeMessage(id) {
+            try {
+                await readResponse(fetch('api/messages/' + encodeURIComponent(id) + '/like', { method: 'PUT' }));
+                clearError();
+                await loadMessages();
+            } catch (error) {
+                showError('按讚失敗：' + error.message);
+            }
+        }
+
+        // 刪除留言
+        async function deleteMessage(id) {
+            if (!confirm('確定要刪除這則留言嗎？')) return;
+            try {
+                await readResponse(fetch('api/messages/' + encodeURIComponent(id), { method: 'DELETE' }));
+                clearError();
+                await loadMessages();
+            } catch (error) {
+                showError('刪除留言失敗：' + error.message);
+            }
+        }
+
+        // 切換排序方式
+        sortByTimeBtn.addEventListener('click', () => {
+            currentSort = 'time';
+            clearError();
+            loadMessages();
+        });
+
+        sortByLikesBtn.addEventListener('click', () => {
+            currentSort = 'likes';
+            clearError();
+            loadMessages();
+        });
+
+        // 初始化載入留言
+        loadMessages();
+    });
+  index.html: "<!DOCTYPE html>\n<html lang=\"zh-TW\">\n<head>\n    <meta charset=\"UTF-8\">\n    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n    <title>團隊留言板</title>\n    <link rel=\"stylesheet\" href=\"style.css\">\n</head>\n<body>\n    <div class=\"container\">\n        <h1>團隊留言板</h1>\n\n        <!-- 錯誤訊息 -->\n        <div id=\"errorBox\" class=\"error-box\" role=\"alert\" hidden></div>\n\n        <!-- 新增留言表單 -->\n        <form id=\"messageForm\">\n            <input type=\"text\" id=\"authorInput\" placeholder=\"您的名字\" maxlength=\"50\" required>\n            <textarea id=\"messageInput\" placeholder=\"輸入您的留言...\" required></textarea>\n            <button type=\"submit\">發表留言</button>\n        </form>\n\n        <!-- 排序按鈕 -->\n        <div class=\"sort-buttons\">\n            <button id=\"sortByTime\" type=\"button\">依時間排序</button>\n            <button id=\"sortByLikes\" type=\"button\">依讚數排序</button>\n        </div>\n\n        <!-- 留言列表 -->\n        <div id=\"messagesContainer\"></div>\n    </div>\n\n    <script src=\"app.js\"></script>\n</body>\n</html>"
   server.py: |
     """laoban web server (fixed template, not generated by AI).
 
@@ -144,4 +337,151 @@ data:
 
     if __name__ == "__main__":
         main()
-  style.css: "body {\n    font-family: 'Microsoft JhengHei', Arial, sans-serif;\n    background-color: #f5f5f5;\n    margin: 0;\n    padding: 0;\n}\n\n.container {\n    max-width: 800px;\n    margin: 0 auto;\n    padding: 20px;\n}\n\nh1 {\n    text-align: center;\n    color: #333;\n    margin-bottom: 30px;\n}\n\n#messageForm {\n    background-color: white;\n    padding: 20px;\n    border-radius: 8px;\n    box-shadow: 0 2px 4px rgba(0,0,0,0.1);\n    margin-bottom: 30px;\n}\n\n#messageInput {\n    width: 100%;\n    height: 100px;\n    padding: 10px;\n    border: 1px solid #ddd;\n    border-radius: 4px;\n    resize: vertical;\n    font-size: 16px;\n    box-sizing: border-box;\n}\n\nbutton {\n    background-color: #007bff;\n    color: white;\n    border: none;\n    padding: 10px 20px;\n    border-radius: 4px;\n    cursor: pointer;\n    font-size: 16px;\n    margin-top: 10px;\n}\n\nbutton:hover {\n    background-color: #0056b3;\n}\n\n.sort-buttons {\n    text-align: center;\n    margin-bottom: 20px;\n}\n\n.sort-buttons button {\n    margin: 0 10px;\n    background-color: #6c757d;\n}\n\n.sort-buttons button:hover {\n    background-color: #545b62;\n}\n\n.message {\n    background-color: white;\n    padding: 20px;\n    border-radius: 8px;\n    box-shadow: 0 2px 4px rgba(0,0,0,0.1);\n    margin-bottom: 15px;\n}\n\n.message p {\n    margin: 0 0 10px 0;\n    font-size: 16px;\n    line-height: 1.5;\n}\n\n.message-info {\n    display: flex;\n    justify-content: space-between;\n    align-items: center;\n    flex-wrap: wrap;\n    gap: 10px;\n    font-size: 14px;\n    color: #666;\n}\n\n.message-info span {\n    margin-right: 15px;\n}\n\n.like-btn, .delete-btn {\n    background-color: #28a745;\n    padding: 5px 10px;\n    font-size: 14px;\n}\n\n.delete-btn {\n    background-color: #dc3545;\n}\n\n.like-btn:hover, .delete-btn:hover {\n    opacity: 0.8;\n}\n\n@media (max-width: 600px) {\n    .message-info {\n        flex-direction: column;\n        align-items: flex-start;\n    }\n    \n    .message-info span {\n        margin-right: 0;\n        margin-bottom: 5px;\n    }\n}"
+  style.css: |
+    body {
+        font-family: 'Microsoft JhengHei', Arial, sans-serif;
+        background-color: #f5f5f5;
+        margin: 0;
+        padding: 0;
+    }
+
+    .container {
+        max-width: 800px;
+        margin: 0 auto;
+        padding: 20px;
+    }
+
+    h1 {
+        text-align: center;
+        color: #0b2a6f;
+        margin-bottom: 30px;
+    }
+
+    .error-box {
+        background-color: #f8d7da;
+        color: #721c24;
+        border: 1px solid #f5c6cb;
+        border-radius: 4px;
+        padding: 12px 16px;
+        margin-bottom: 20px;
+        font-size: 16px;
+    }
+
+    .error-box[hidden] {
+        display: none;
+    }
+
+    #messageForm {
+        background-color: white;
+        padding: 20px;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        margin-bottom: 30px;
+    }
+
+    #authorInput {
+        width: 100%;
+        padding: 10px;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        font-size: 16px;
+        box-sizing: border-box;
+        margin-bottom: 10px;
+    }
+
+    #messageInput {
+        width: 100%;
+        height: 100px;
+        padding: 10px;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        resize: vertical;
+        font-size: 16px;
+        box-sizing: border-box;
+    }
+
+    button {
+        background-color: #007bff;
+        color: white;
+        border: none;
+        padding: 14px 28px;
+        border-radius: 6px;
+        cursor: pointer;
+        font-size: 20px;
+        margin-top: 10px;
+    }
+
+    button:hover {
+        background-color: #0056b3;
+    }
+
+    .sort-buttons {
+        text-align: center;
+        margin-bottom: 20px;
+    }
+
+    .sort-buttons button {
+        margin: 0 10px;
+        background-color: #6c757d;
+    }
+
+    .sort-buttons button:hover {
+        background-color: #545b62;
+    }
+
+    .message {
+        background-color: white;
+        padding: 20px;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        margin-bottom: 15px;
+    }
+
+    .message p {
+        margin: 0 0 10px 0;
+        font-size: 16px;
+        line-height: 1.5;
+        word-break: break-word;
+        white-space: pre-wrap;
+    }
+
+    .message-info {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 10px;
+        font-size: 14px;
+        color: #666;
+    }
+
+    .message-info span {
+        margin-right: 15px;
+    }
+
+    .like-btn, .delete-btn {
+        background-color: #28a745;
+        padding: 10px 20px;
+        font-size: 18px;
+        margin-top: 0;
+    }
+
+    .delete-btn {
+        background-color: #dc3545;
+    }
+
+    .like-btn:hover, .delete-btn:hover {
+        opacity: 0.8;
+    }
+
+    @media (max-width: 600px) {
+        .message-info {
+            flex-direction: column;
+            align-items: flex-start;
+        }
+
+        .message-info span {
+            margin-right: 0;
+            margin-bottom: 5px;
+        }
+    }
