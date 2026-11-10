@@ -1,0 +1,112 @@
+{
+  "appName": "t62-ant-b",
+  "files": {
+    "api": {
+      "handler.py": "import json\n\n# In-memory storage\n_todos = []\n_next_id = 1\n\nMAX_TITLE_LENGTH = 200\n\n\ndef _remaining():\n    return sum(1 for t in _todos if not t[\"done\"])\n\n\ndef _error(status, message):\n    return status, {\"error\": message}\n\n\ndef _parse_body(body):\n    if not body:\n        return {}\n    try:\n        data = json.loads(body.decode(\"utf-8\"))\n    except (ValueError, UnicodeDecodeError):\n        return None\n    if not isinstance(data, dict):\n        return None\n    return data\n\n\ndef _find(todo_id):\n    for t in _todos:\n        if t[\"id\"] == todo_id:\n            return t\n    return None\n\n\ndef _list_todos():\n    return 200, {\"items\": [dict(t) for t in _todos], \"remaining\": _remaining()}\n\n\ndef _create_todo(body):\n    global _next_id\n    data = _parse_body(body)\n    if data is None:\n        return _error(400, \"請求內容不是有效的 JSON\")\n    title = data.get(\"title\")\n    if not isinstance(title, str) or not title.strip():\n        return _error(400, \"標題不可為空\")\n    title = title.strip()\n    if len(title) > MAX_TITLE_LENGTH:\n        return _error(400, \"標題過長（最多 %d 字）\" % MAX_TITLE_LENGTH)\n    todo = {\"id\": str(_next_id), \"title\": title, \"done\": False}\n    _next_id += 1\n    _todos.append(todo)\n    return 201, dict(todo)\n\n\ndef _update_todo(todo_id, body):\n    todo = _find(todo_id)\n    if todo is None:\n        return _error(404, \"找不到指定的待辦\")\n    data = _parse_body(body)\n    if data is None:\n        return _error(400, \"請求內容不是有效的 JSON\")\n    if \"done\" not in data or not isinstance(data[\"done\"], bool):\n        return _error(400, \"done 必須為 true 或 false\")\n    todo[\"done\"] = data[\"done\"]\n    return 200, dict(todo)\n\n\ndef _delete_todo(todo_id):\n    todo = _find(todo_id)\n    if todo is None:\n        return _error(404, \"找不到指定的待辦\")\n    _todos.remove(todo)\n    return 200, {\"deleted\": True, \"id\": todo_id}\n\n\ndef _stats():\n    return 200, {\"remaining\": _remaining(), \"total\": len(_todos)}\n\n\ndef handle(method, path, body):\n    method = (method or \"\").upper()\n    path = path or \"/\"\n    if not path.startswith(\"/\"):\n        path = \"/\" + path\n    if len(path) > 1:\n        path = path.rstrip(\"/\")\n\n    if method == \"OPTIONS\":\n        return 200, {}\n\n    if path == \"/todos\":\n        if method == \"GET\":\n            return _list_todos()\n        if method == \"POST\":\n            return _create_todo(body)\n        return _error(405, \"不支援的請求方法\")\n\n    if path.startswith(\"/todos/\"):\n        todo_id = path[len(\"/todos/\"):]\n        if not todo_id or \"/\" in todo_id:\n            return _error(404, \"找不到路徑\")\n        if method == \"PATCH\":\n            return _update_todo(todo_id, body)\n        if method == \"DELETE\":\n            return _delete_todo(todo_id)\n        return _error(405, \"不支援的請求方法\")\n\n    if path == \"/stats\":\n        if method == \"GET\":\n            return _stats()\n        return _error(405, \"不支援的請求方法\")\n\n    return _error(404, \"找不到路徑\")\n"
+    },
+    "web": {
+      "app.js": "(function () {\n  var form = document.getElementById('todo-form');\n  var input = document.getElementById('todo-input');\n  var list = document.getElementById('todo-list');\n  var remainingEl = document.getElementById('remaining');\n  var messageEl = document.getElementById('message');\n  var emptyEl = document.getElementById('empty');\n\n  function showMessage(text) {\n    messageEl.textContent = text || '';\n  }\n\n  function request(method, path, payload) {\n    var options = { method: method, headers: {} };\n    if (payload !== undefined) {\n      options.headers['Content-Type'] = 'application/json';\n      options.body = JSON.stringify(payload);\n    }\n    return fetch('api/' + path, options).then(function (res) {\n      return res.text().then(function (text) {\n        var data = {};\n        try {\n          data = text ? JSON.parse(text) : {};\n        } catch (e) {\n          data = {};\n        }\n        if (!res.ok) {\n          throw new Error(data.error || ('請求失敗（' + res.status + '）'));\n        }\n        return data;\n      });\n    });\n  }\n\n  function render(data) {\n    var items = data.items || [];\n    list.innerHTML = '';\n    items.forEach(function (item) {\n      var li = document.createElement('li');\n      if (item.done) {\n        li.className = 'done';\n      }\n\n      var checkbox = document.createElement('input');\n      checkbox.type = 'checkbox';\n      checkbox.checked = !!item.done;\n      checkbox.setAttribute('aria-label', '標記完成：' + item.title);\n      checkbox.addEventListener('change', function () {\n        toggle(item.id, checkbox.checked);\n      });\n\n      var span = document.createElement('span');\n      span.className = 'title';\n      span.textContent = item.title;\n\n      var del = document.createElement('button');\n      del.type = 'button';\n      del.className = 'delete';\n      del.textContent = '刪除';\n      del.addEventListener('click', function () {\n        remove(item.id);\n      });\n\n      li.appendChild(checkbox);\n      li.appendChild(span);\n      li.appendChild(del);\n      list.appendChild(li);\n    });\n    emptyEl.hidden = items.length !== 0;\n    remainingEl.textContent = String(data.remaining || 0);\n  }\n\n  function load() {\n    return request('GET', 'todos').then(function (data) {\n      showMessage('');\n      render(data);\n    }).catch(function (err) {\n      showMessage(err.message);\n    });\n  }\n\n  function toggle(id, done) {\n    request('PATCH', 'todos/' + encodeURIComponent(id), { done: done })\n      .then(load)\n      .catch(function (err) {\n        showMessage(err.message);\n        load();\n      });\n  }\n\n  function remove(id) {\n    request('DELETE', 'todos/' + encodeURIComponent(id))\n      .then(load)\n      .catch(function (err) {\n        showMessage(err.message);\n        load();\n      });\n  }\n\n  form.addEventListener('submit', function (event) {\n    event.preventDefault();\n    var title = input.value.trim();\n    if (!title) {\n      showMessage('請輸入待辦事項標題');\n      return;\n    }\n    request('POST', 'todos', { title: title })\n      .then(function () {\n        input.value = '';\n        input.focus();\n        return load();\n      })\n      .catch(function (err) {\n        showMessage(err.message);\n      });\n  });\n\n  load();\n})();\n",
+      "index.html": "<!DOCTYPE html>\n<html lang=\"zh-TW\">\n<head>\n  <meta charset=\"utf-8\">\n  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n  <title>待辦事項清單</title>\n  <link rel=\"stylesheet\" href=\"style.css\">\n</head>\n<body>\n  <main class=\"container\">\n    <h1>待辦事項清單</h1>\n    <form id=\"todo-form\" autocomplete=\"off\">\n      <input type=\"text\" id=\"todo-input\" placeholder=\"輸入新的待辦事項\" maxlength=\"200\" aria-label=\"待辦事項標題\">\n      <button type=\"submit\">新增</button>\n    </form>\n    <p id=\"message\" class=\"message\" role=\"alert\"></p>\n    <ul id=\"todo-list\"></ul>\n    <p id=\"empty\" class=\"empty\" hidden>目前沒有待辦事項</p>\n    <p class=\"remaining\">尚未完成：<span id=\"remaining\">0</span> 項</p>\n  </main>\n  <script src=\"app.js\"></script>\n</body>\n</html>\n",
+      "style.css": "* {\n  box-sizing: border-box;\n}\n\nbody {\n  margin: 0;\n  font-family: -apple-system, BlinkMacSystemFont, \"Segoe UI\", \"Noto Sans TC\", \"PingFang TC\", \"Microsoft JhengHei\", sans-serif;\n  background: #f3f4f6;\n  color: #1f2937;\n}\n\n.container {\n  max-width: 520px;\n  margin: 40px auto;\n  padding: 24px;\n  background: #ffffff;\n  border-radius: 12px;\n  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);\n}\n\nh1 {\n  margin-top: 0;\n  font-size: 1.6rem;\n  text-align: center;\n}\n\nform {\n  display: flex;\n  gap: 8px;\n}\n\nform input[type=\"text\"] {\n  flex: 1;\n  padding: 10px 12px;\n  border: 1px solid #d1d5db;\n  border-radius: 8px;\n  font-size: 1rem;\n}\n\nbutton {\n  padding: 10px 16px;\n  border: none;\n  border-radius: 8px;\n  background: #2563eb;\n  color: #ffffff;\n  font-size: 1rem;\n  cursor: pointer;\n}\n\nbutton:hover {\n  background: #1d4ed8;\n}\n\nbutton.delete {\n  padding: 6px 10px;\n  background: #ef4444;\n  font-size: 0.9rem;\n}\n\nbutton.delete:hover {\n  background: #dc2626;\n}\n\n.message {\n  min-height: 1.2em;\n  margin: 8px 0;\n  color: #b91c1c;\n  font-size: 0.9rem;\n}\n\nul {\n  list-style: none;\n  margin: 0;\n  padding: 0;\n}\n\nli {\n  display: flex;\n  align-items: center;\n  gap: 10px;\n  padding: 10px 4px;\n  border-bottom: 1px solid #e5e7eb;\n}\n\nli .title {\n  flex: 1;\n  word-break: break-all;\n}\n\nli.done .title {\n  text-decoration: line-through;\n  color: #9ca3af;\n}\n\nli input[type=\"checkbox\"] {\n  width: 18px;\n  height: 18px;\n}\n\n.empty {\n  text-align: center;\n  color: #9ca3af;\n}\n\n.remaining {\n  margin-bottom: 0;\n  text-align: right;\n  color: #4b5563;\n}\n"
+    }
+  },
+  "history": [
+    {
+      "at": "2026-11-10T10:34:47Z",
+      "by": "laoban-cli-test",
+      "kind": "create",
+      "model": "claude-sonnet-5-5",
+      "request": "做一個待辦事項清單：可以新增、標記完成、刪除待辦，並顯示還沒完成的數量",
+      "summary": "一個簡單的待辦事項清單應用：使用者可以新增待辦、標記完成（或取消完成）、刪除待辦，頁面會即時顯示尚未完成的數量。資料存放在 API 的記憶體中。"
+    }
+  ],
+  "plan": {
+    "appName": "t62-ant-b",
+    "components": {
+      "api": {
+        "endpoints": [
+          {
+            "method": "GET",
+            "path": "/todos",
+            "purpose": "取得所有待辦，並一併回傳尚未完成的數量",
+            "response": "{\"items\": [{\"id\": \"1\", \"title\": \"買牛奶\", \"done\": false}], \"remaining\": 1}"
+          },
+          {
+            "method": "POST",
+            "path": "/todos",
+            "purpose": "新增一筆待辦，預設為未完成",
+            "request": "{\"title\": \"買牛奶\"}",
+            "response": "{\"id\": \"1\", \"title\": \"買牛奶\", \"done\": false}"
+          },
+          {
+            "method": "PATCH",
+            "path": "/todos/{id}",
+            "purpose": "標記待辦為完成或取消完成",
+            "request": "{\"done\": true}",
+            "response": "{\"id\": \"1\", \"title\": \"買牛奶\", \"done\": true}"
+          },
+          {
+            "method": "DELETE",
+            "path": "/todos/{id}",
+            "purpose": "刪除指定的待辦",
+            "response": "{\"deleted\": true, \"id\": \"1\"}"
+          },
+          {
+            "method": "GET",
+            "path": "/stats",
+            "purpose": "取得尚未完成的待辦數量",
+            "response": "{\"remaining\": 1, \"total\": 1}"
+          }
+        ],
+        "modules": [
+          {
+            "name": "待辦資料",
+            "purpose": "在記憶體中保存待辦清單，提供新增、查詢、更新完成狀態與刪除"
+          },
+          {
+            "name": "統計",
+            "purpose": "計算尚未完成的待辦數量"
+          },
+          {
+            "name": "路由與回應",
+            "purpose": "解析請求、分派到對應處理、回傳 JSON 與錯誤訊息"
+          }
+        ]
+      },
+      "web": {
+        "modules": [
+          {
+            "name": "待辦清單畫面",
+            "purpose": "顯示待辦清單，每一項有完成勾選框與刪除按鈕，已完成項目以刪除線標示"
+          },
+          {
+            "name": "新增待辦表單",
+            "purpose": "提供輸入欄與送出按鈕，用來新增待辦，標題為空時不送出"
+          },
+          {
+            "name": "未完成數量顯示",
+            "purpose": "顯示尚未完成的待辦數量，並在每次變更後更新"
+          },
+          {
+            "name": "API 呼叫",
+            "purpose": "封裝對 API 的 HTTP 請求並處理錯誤"
+          }
+        ]
+      }
+    },
+    "notes": "資料只存在 API 的記憶體中，服務重啟後會消失。路徑中的 {id} 代表待辦的 id。標題為空或找不到待辦時，API 回傳含 error 欄位的 JSON 與適當的 HTTP 狀態碼（400 或 404）。",
+    "steps": [
+      "規劃待辦資料結構：id、title、done",
+      "實作 API 的待辦資料存取模組，將資料保存在記憶體中",
+      "實作 API 的未完成數量統計",
+      "實作 API 的路由與 JSON 回應處理，包含錯誤處理與 CORS",
+      "建立網頁的畫面結構與樣式，包含輸入欄、清單與未完成數量區塊",
+      "實作網頁的 API 呼叫模組",
+      "實作網頁的清單顯示與互動（新增、勾選完成、刪除）",
+      "實作網頁的未完成數量顯示",
+      "部署並驗證：新增、標記完成、刪除與數量更新皆正常"
+    ],
+    "summary": "一個簡單的待辦事項清單應用：使用者可以新增待辦、標記完成（或取消完成）、刪除待辦，頁面會即時顯示尚未完成的數量。資料存放在 API 的記憶體中。"
+  },
+  "schema": 1
+}
