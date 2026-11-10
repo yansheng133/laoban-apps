@@ -1,0 +1,119 @@
+{
+  "appName": "t62-rv",
+  "files": {
+    "api": {
+      "handler.py": "import json\nfrom datetime import datetime\n\nBOOKS = []\nLOANS = []\n_next = {\"book\": 1, \"loan\": 1}\n\n\ndef _new_id(kind):\n    v = _next[kind]\n    _next[kind] += 1\n    return str(v)\n\n\ndef _now():\n    return datetime.now().replace(microsecond=0).isoformat()\n\n\ndef _parse(body):\n    if not body:\n        return None, (400, {\"error\": \"請提供 JSON 請求內容\"})\n    try:\n        data = json.loads(body.decode(\"utf-8\"))\n    except Exception:\n        return None, (400, {\"error\": \"請求內容不是有效的 JSON\"})\n    if not isinstance(data, dict):\n        return None, (400, {\"error\": \"請求內容必須是 JSON 物件\"})\n    return data, None\n\n\ndef _str(data, key):\n    v = data.get(key)\n    if v is None:\n        return \"\"\n    if isinstance(v, (int, float)) and not isinstance(v, bool):\n        v = str(v)\n    if not isinstance(v, str):\n        return \"\"\n    return v.strip()\n\n\ndef _find_book(book_id):\n    for b in BOOKS:\n        if b[\"id\"] == book_id:\n            return b\n    return None\n\n\ndef _active_loan(book_id):\n    for l in LOANS:\n        if l[\"book_id\"] == book_id and l[\"returned_at\"] is None:\n            return l\n    return None\n\n\ndef _list_books():\n    return 200, {\"items\": [dict(b) for b in BOOKS]}\n\n\ndef _add_book(body):\n    data, err = _parse(body)\n    if err:\n        return err\n    title = _str(data, \"title\")\n    author = _str(data, \"author\")\n    if not title:\n        return 400, {\"error\": \"請輸入書名\"}\n    if not author:\n        return 400, {\"error\": \"請輸入作者\"}\n    book = {\"id\": _new_id(\"book\"), \"title\": title, \"author\": author, \"available\": True}\n    BOOKS.append(book)\n    return 201, dict(book)\n\n\ndef _lend(body):\n    data, err = _parse(body)\n    if err:\n        return err\n    book_id = _str(data, \"book_id\")\n    borrower = _str(data, \"borrower\")\n    if not book_id:\n        return 400, {\"error\": \"請提供書籍 id\"}\n    if not borrower:\n        return 400, {\"error\": \"請輸入借閱人姓名\"}\n    book = _find_book(book_id)\n    if book is None:\n        return 404, {\"error\": \"找不到這本書\"}\n    if not book[\"available\"] or _active_loan(book_id) is not None:\n        return 409, {\"error\": \"書籍已借出\"}\n    loan = {\n        \"id\": _new_id(\"loan\"),\n        \"book_id\": book_id,\n        \"borrower\": borrower,\n        \"borrowed_at\": _now(),\n        \"returned_at\": None,\n    }\n    LOANS.append(loan)\n    book[\"available\"] = False\n    return 201, dict(loan)\n\n\ndef _return(body):\n    data, err = _parse(body)\n    if err:\n        return err\n    book_id = _str(data, \"book_id\")\n    if not book_id:\n        return 400, {\"error\": \"請提供書籍 id\"}\n    book = _find_book(book_id)\n    if book is None:\n        return 404, {\"error\": \"找不到這本書\"}\n    loan = _active_loan(book_id)\n    if loan is None:\n        return 409, {\"error\": \"書籍並非借出中\"}\n    loan[\"returned_at\"] = _now()\n    book[\"available\"] = True\n    return 200, dict(loan)\n\n\ndef _active():\n    items = []\n    for l in LOANS:\n        if l[\"returned_at\"] is None:\n            book = _find_book(l[\"book_id\"])\n            items.append({\n                \"id\": l[\"id\"],\n                \"book_id\": l[\"book_id\"],\n                \"title\": book[\"title\"] if book else \"\",\n                \"borrower\": l[\"borrower\"],\n                \"borrowed_at\": l[\"borrowed_at\"],\n            })\n    return 200, {\"items\": items}\n\n\nROUTES = {\n    \"/books\": {\"GET\": lambda b: _list_books(), \"POST\": _add_book},\n    \"/loans\": {\"POST\": _lend},\n    \"/returns\": {\"POST\": _return},\n    \"/loans/active\": {\"GET\": lambda b: _active()},\n}\n\n\ndef handle(method, path, body):\n    try:\n        p = path.split(\"?\", 1)[0]\n        if not p.startswith(\"/\"):\n            p = \"/\" + p\n        if len(p) > 1:\n            p = p.rstrip(\"/\")\n        route = ROUTES.get(p)\n        if route is None:\n            return 404, {\"error\": \"找不到路徑\"}\n        fn = route.get(method.upper())\n        if fn is None:\n            return 405, {\"error\": \"不支援的請求方法\"}\n        return fn(body)\n    except Exception:\n        return 500, {\"error\": \"伺服器發生錯誤\"}\n"
+    },
+    "web": {
+      "app.js": "(function () {\n  \"use strict\";\n\n  var messageEl = document.getElementById(\"message\");\n  var booksBody = document.getElementById(\"books-body\");\n  var loansBody = document.getElementById(\"loans-body\");\n  var bookForm = document.getElementById(\"book-form\");\n  var titleInput = document.getElementById(\"book-title\");\n  var authorInput = document.getElementById(\"book-author\");\n\n  var messageTimer = null;\n\n  function showMessage(text, isError) {\n    messageEl.textContent = text;\n    messageEl.className = \"message \" + (isError ? \"error\" : \"ok\");\n    messageEl.hidden = false;\n    if (messageTimer) {\n      clearTimeout(messageTimer);\n      messageTimer = null;\n    }\n    if (!isError) {\n      messageTimer = setTimeout(function () {\n        messageEl.hidden = true;\n      }, 4000);\n    }\n  }\n\n  function clearMessage() {\n    messageEl.hidden = true;\n    messageEl.textContent = \"\";\n  }\n\n  // API 呼叫：封裝回應處理與錯誤訊息\n  function handleResponse(res) {\n    return res.text().then(function (text) {\n      var data = null;\n      if (text) {\n        try {\n          data = JSON.parse(text);\n        } catch (e) {\n          data = null;\n        }\n      }\n      if (!res.ok) {\n        var msg = data && data.error ? data.error : \"請求失敗（HTTP \" + res.status + \"）\";\n        var err = new Error(msg);\n        err.status = res.status;\n        throw err;\n      }\n      if (data === null) {\n        throw new Error(\"伺服器回應格式不正確\");\n      }\n      return data;\n    });\n  }\n\n  function networkFailure() {\n    throw new Error(\"無法連線到伺服器，請稍後再試\");\n  }\n\n  function request(fetchPromise) {\n    return fetchPromise.then(handleResponse, networkFailure);\n  }\n\n  function postOptions(body) {\n    return {\n      method: \"POST\",\n      headers: { \"Content-Type\": \"application/json\" },\n      body: JSON.stringify(body)\n    };\n  }\n\n  function reportError(err) {\n    showMessage(err && err.message ? err.message : \"發生未知錯誤\", true);\n  }\n\n  function cell(text, className) {\n    var td = document.createElement(\"td\");\n    td.textContent = text;\n    if (className) {\n      td.className = className;\n    }\n    return td;\n  }\n\n  function emptyRow(colspan, text) {\n    var tr = document.createElement(\"tr\");\n    var td = document.createElement(\"td\");\n    td.colSpan = colspan;\n    td.className = \"empty\";\n    td.textContent = text;\n    tr.appendChild(td);\n    return tr;\n  }\n\n  function formatTime(value) {\n    if (!value) {\n      return \"\";\n    }\n    var d = new Date(value);\n    if (isNaN(d.getTime())) {\n      return String(value);\n    }\n    return d.toLocaleString(\"zh-TW\");\n  }\n\n  // 書籍管理與借閱操作\n  function renderBooks(items) {\n    booksBody.textContent = \"\";\n    if (!items.length) {\n      booksBody.appendChild(emptyRow(4, \"目前沒有書籍\"));\n      return;\n    }\n    items.forEach(function (book) {\n      var tr = document.createElement(\"tr\");\n      tr.appendChild(cell(book.title));\n      tr.appendChild(cell(book.author));\n\n      var statusTd = document.createElement(\"td\");\n      var badge = document.createElement(\"span\");\n      badge.className = \"badge \" + (book.available ? \"in\" : \"out\");\n      badge.textContent = book.available ? \"在館\" : \"借出中\";\n      statusTd.appendChild(badge);\n      tr.appendChild(statusTd);\n\n      var actionTd = document.createElement(\"td\");\n      if (book.available) {\n        var form = document.createElement(\"form\");\n        form.className = \"loan-form\";\n        form.autocomplete = \"off\";\n        var input = document.createElement(\"input\");\n        input.type = \"text\";\n        input.placeholder = \"借閱人姓名\";\n        input.required = true;\n        input.setAttribute(\"aria-label\", \"借閱人姓名\");\n        var btn = document.createElement(\"button\");\n        btn.type = \"submit\";\n        btn.textContent = \"借出\";\n        form.appendChild(input);\n        form.appendChild(btn);\n        form.addEventListener(\"submit\", function (ev) {\n          ev.preventDefault();\n          lendBook(book, input.value.trim(), btn);\n        });\n        actionTd.appendChild(form);\n      } else {\n        var returnBtn = document.createElement(\"button\");\n        returnBtn.type = \"button\";\n        returnBtn.className = \"secondary\";\n        returnBtn.textContent = \"歸還\";\n        returnBtn.addEventListener(\"click\", function () {\n          returnBook(book, returnBtn);\n        });\n        actionTd.appendChild(returnBtn);\n      }\n      tr.appendChild(actionTd);\n      booksBody.appendChild(tr);\n    });\n  }\n\n  // 借出中清單\n  function renderLoans(items) {\n    loansBody.textContent = \"\";\n    if (!items.length) {\n      loansBody.appendChild(emptyRow(3, \"目前沒有借出中的書籍\"));\n      return;\n    }\n    items.forEach(function (loan) {\n      var tr = document.createElement(\"tr\");\n      tr.appendChild(cell(loan.title));\n      tr.appendChild(cell(loan.borrower));\n      tr.appendChild(cell(formatTime(loan.borrowed_at)));\n      loansBody.appendChild(tr);\n    });\n  }\n\n  function loadBooks() {\n    return request(fetch(\"api/books\")).then(function (data) {\n      renderBooks(Array.isArray(data.items) ? data.items : []);\n    });\n  }\n\n  function loadLoans() {\n    return request(fetch(\"api/loans/active\")).then(function (data) {\n      renderLoans(Array.isArray(data.items) ? data.items : []);\n    });\n  }\n\n  function refresh() {\n    return Promise.all([loadBooks(), loadLoans()]).catch(reportError);\n  }\n\n  function lendBook(book, borrower, btn) {\n    if (!borrower) {\n      showMessage(\"請輸入借閱人姓名\", true);\n      return;\n    }\n    btn.disabled = true;\n    request(fetch(\"api/loans\", postOptions({ book_id: book.id, borrower: borrower })))\n      .then(function () {\n        showMessage(\"已將《\" + book.title + \"》借給 \" + borrower, false);\n      })\n      .catch(reportError)\n      .then(function () {\n        return refresh();\n      });\n  }\n\n  function returnBook(book, btn) {\n    btn.disabled = true;\n    request(fetch(\"api/returns\", postOptions({ book_id: book.id })))\n      .then(function () {\n        showMessage(\"已歸還《\" + book.title + \"》\", false);\n      })\n      .catch(reportError)\n      .then(function () {\n        return refresh();\n      });\n  }\n\n  bookForm.addEventListener(\"submit\", function (ev) {\n    ev.preventDefault();\n    var title = titleInput.value.trim();\n    var author = authorInput.value.trim();\n    if (!title || !author) {\n      showMessage(\"請填寫書名與作者\", true);\n      return;\n    }\n    clearMessage();\n    request(fetch(\"api/books\", postOptions({ title: title, author: author })))\n      .then(function (book) {\n        bookForm.reset();\n        showMessage(\"已新增《\" + (book.title || title) + \"》\", false);\n        titleInput.focus();\n      })\n      .catch(reportError)\n      .then(function () {\n        return refresh();\n      });\n  });\n\n  refresh();\n})();\n",
+      "index.html": "<!DOCTYPE html>\n<html lang=\"zh-Hant-TW\">\n<head>\n  <meta charset=\"utf-8\">\n  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n  <title>圖書借閱小系統</title>\n  <link rel=\"stylesheet\" href=\"style.css\">\n</head>\n<body>\n  <header>\n    <h1>圖書借閱小系統</h1>\n    <p class=\"sub\">新增書籍、借出、歸還，並查看目前借出中的書</p>\n  </header>\n\n  <div id=\"message\" class=\"message\" role=\"alert\" aria-live=\"polite\" hidden></div>\n\n  <main>\n    <section class=\"card\">\n      <h2>新增書籍</h2>\n      <form id=\"book-form\" autocomplete=\"off\">\n        <label for=\"book-title\">書名</label>\n        <input id=\"book-title\" name=\"title\" type=\"text\" required>\n        <label for=\"book-author\">作者</label>\n        <input id=\"book-author\" name=\"author\" type=\"text\" required>\n        <button type=\"submit\">新增書籍</button>\n      </form>\n    </section>\n\n    <section class=\"card\">\n      <h2>所有書籍</h2>\n      <table>\n        <thead>\n          <tr>\n            <th>書名</th>\n            <th>作者</th>\n            <th>狀態</th>\n            <th>操作</th>\n          </tr>\n        </thead>\n        <tbody id=\"books-body\">\n          <tr><td colspan=\"4\" class=\"empty\">載入中…</td></tr>\n        </tbody>\n      </table>\n    </section>\n\n    <section class=\"card\">\n      <h2>借出中清單</h2>\n      <table>\n        <thead>\n          <tr>\n            <th>書名</th>\n            <th>借閱人</th>\n            <th>借出時間</th>\n          </tr>\n        </thead>\n        <tbody id=\"loans-body\">\n          <tr><td colspan=\"3\" class=\"empty\">載入中…</td></tr>\n        </tbody>\n      </table>\n    </section>\n  </main>\n\n  <script src=\"app.js\"></script>\n</body>\n</html>\n",
+      "style.css": "* {\n  box-sizing: border-box;\n}\n\nbody {\n  margin: 0;\n  padding: 0 16px 40px;\n  font-family: -apple-system, \"Noto Sans TC\", \"PingFang TC\", \"Microsoft JhengHei\", sans-serif;\n  background: #f4f6f8;\n  color: #222;\n  line-height: 1.5;\n}\n\nheader {\n  max-width: 900px;\n  margin: 0 auto;\n  padding: 24px 0 8px;\n}\n\nh1 {\n  margin: 0;\n  font-size: 1.6rem;\n}\n\nh2 {\n  margin: 0 0 12px;\n  font-size: 1.15rem;\n}\n\n.sub {\n  margin: 4px 0 0;\n  color: #666;\n}\n\nmain {\n  max-width: 900px;\n  margin: 0 auto;\n}\n\n.card {\n  background: #fff;\n  border-radius: 8px;\n  padding: 16px 20px;\n  margin-top: 16px;\n  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);\n  overflow-x: auto;\n}\n\n.message {\n  max-width: 900px;\n  margin: 12px auto 0;\n  padding: 10px 14px;\n  border-radius: 6px;\n  font-size: 0.95rem;\n}\n\n.message[hidden] {\n  display: none;\n}\n\n.message.error {\n  background: #fdecea;\n  color: #a12622;\n  border: 1px solid #f5c2be;\n}\n\n.message.ok {\n  background: #e8f5e9;\n  color: #1e6b2e;\n  border: 1px solid #b9dfbf;\n}\n\nlabel {\n  display: block;\n  margin: 8px 0 4px;\n  font-size: 0.9rem;\n  color: #444;\n}\n\ninput[type=\"text\"] {\n  width: 100%;\n  max-width: 360px;\n  padding: 8px 10px;\n  border: 1px solid #c4cbd2;\n  border-radius: 6px;\n  font-size: 1rem;\n}\n\nbutton {\n  margin-top: 12px;\n  padding: 8px 16px;\n  border: none;\n  border-radius: 6px;\n  background: #2563eb;\n  color: #fff;\n  font-size: 0.95rem;\n  cursor: pointer;\n}\n\nbutton:hover {\n  background: #1d4fc4;\n}\n\nbutton:disabled {\n  opacity: 0.6;\n  cursor: not-allowed;\n}\n\nbutton.secondary {\n  margin-top: 0;\n  background: #6b7280;\n}\n\nbutton.secondary:hover {\n  background: #4b5563;\n}\n\ntable {\n  width: 100%;\n  border-collapse: collapse;\n}\n\nth,\ntd {\n  text-align: left;\n  padding: 8px 6px;\n  border-bottom: 1px solid #e5e8eb;\n  vertical-align: middle;\n}\n\nth {\n  font-size: 0.85rem;\n  color: #555;\n}\n\ntd.empty {\n  text-align: center;\n  color: #888;\n  padding: 16px;\n}\n\n.badge {\n  display: inline-block;\n  padding: 2px 10px;\n  border-radius: 999px;\n  font-size: 0.85rem;\n}\n\n.badge.in {\n  background: #e8f5e9;\n  color: #1e6b2e;\n}\n\n.badge.out {\n  background: #fff3e0;\n  color: #b45309;\n}\n\n.loan-form {\n  display: flex;\n  gap: 8px;\n  align-items: center;\n}\n\n.loan-form input[type=\"text\"] {\n  max-width: 180px;\n  padding: 6px 8px;\n}\n\n.loan-form button {\n  margin-top: 0;\n  padding: 6px 14px;\n}\n"
+    }
+  },
+  "history": [
+    {
+      "at": "2026-11-10T13:56:09Z",
+      "by": "laoban-cli-test",
+      "kind": "create",
+      "model": "claude-sonnet-5-5",
+      "request": "做一個圖書借閱小系統：可以新增書、借出、歸還，列出目前借出中的書與借閱人",
+      "summary": "圖書借閱小系統：可以新增書籍、將書借出給借閱人、歸還書籍，並列出目前借出中的書與借閱人。前端為靜態網頁，後端為單一 Python 模組的 JSON API，資料存放於記憶體中。"
+    }
+  ],
+  "plan": {
+    "appName": "t62-rv",
+    "components": {
+      "api": {
+        "endpoints": [
+          {
+            "method": "GET",
+            "path": "/books",
+            "purpose": "列出所有書籍及其是否在館",
+            "response": "{\"items\":[{\"author\":\"聖修伯里\",\"available\":true,\"id\":\"1\",\"title\":\"小王子\"}]}"
+          },
+          {
+            "method": "POST",
+            "path": "/books",
+            "purpose": "新增一本書，預設為在館",
+            "request": "{\"author\":\"聖修伯里\",\"title\":\"小王子\"}",
+            "response": "{\"author\":\"聖修伯里\",\"available\":true,\"id\":\"1\",\"title\":\"小王子\"}"
+          },
+          {
+            "method": "POST",
+            "path": "/loans",
+            "purpose": "借出書籍給借閱人；書籍不在館時回傳錯誤",
+            "request": "{\"book_id\":\"1\",\"borrower\":\"王小明\"}",
+            "response": "{\"book_id\":\"1\",\"borrowed_at\":\"2024-01-01T10:00:00\",\"borrower\":\"王小明\",\"id\":\"1\",\"returned_at\":null}"
+          },
+          {
+            "method": "POST",
+            "path": "/returns",
+            "purpose": "歸還書籍；書籍並非借出中時回傳錯誤",
+            "request": "{\"book_id\":\"1\"}",
+            "response": "{\"book_id\":\"1\",\"borrowed_at\":\"2024-01-01T10:00:00\",\"borrower\":\"王小明\",\"id\":\"1\",\"returned_at\":\"2024-01-05T09:30:00\"}"
+          },
+          {
+            "method": "GET",
+            "path": "/loans/active",
+            "purpose": "列出目前借出中的書與借閱人",
+            "response": "{\"items\":[{\"book_id\":\"1\",\"borrowed_at\":\"2024-01-01T10:00:00\",\"borrower\":\"王小明\",\"id\":\"1\",\"title\":\"小王子\"}]}"
+          }
+        ],
+        "modules": [
+          {
+            "name": "books",
+            "purpose": "管理書籍資料：新增與列出書籍"
+          },
+          {
+            "name": "loans",
+            "purpose": "管理借閱紀錄：借出、歸還與查詢借出中的書"
+          },
+          {
+            "name": "storage",
+            "purpose": "以記憶體保存書籍與借閱紀錄並產生 id"
+          },
+          {
+            "name": "routing",
+            "purpose": "解析請求路徑與方法、驗證輸入並回傳 JSON 與錯誤"
+          }
+        ]
+      },
+      "web": {
+        "modules": [
+          {
+            "name": "書籍管理",
+            "purpose": "提供新增書籍表單，並顯示所有書籍及其在館／借出狀態"
+          },
+          {
+            "name": "借閱操作",
+            "purpose": "對在館的書籍輸入借閱人姓名後借出，對借出中的書籍執行歸還"
+          },
+          {
+            "name": "借出中清單",
+            "purpose": "顯示目前借出中的書籍與借閱人"
+          },
+          {
+            "name": "API 呼叫",
+            "purpose": "封裝對後端 API 的請求與錯誤訊息顯示"
+          }
+        ]
+      }
+    },
+    "notes": "資料只存在記憶體中，API 重新啟動後會清空。每本書以單一冊數處理（同一時間只能借給一人）。錯誤時回傳 JSON 物件，例如 {\"error\": \"書籍已借出\"}，並使用適當的 HTTP 狀態碼（400、404、409）。",
+    "steps": [
+      "定義書籍資料結構：id、title、author、available（是否在館）",
+      "定義借閱紀錄結構：id、book_id、borrower、borrowed_at、returned_at",
+      "在 handler.py 中建立記憶體儲存區，保存書籍與借閱紀錄",
+      "實作書籍模組：新增書籍、列出所有書籍",
+      "實作借閱模組：借出（檢查書籍是否在館）與歸還（檢查是否借出中）",
+      "實作借出中清單：回傳尚未歸還的書籍與借閱人",
+      "統一錯誤回應格式（JSON 物件含 error 欄位）與 CORS／JSON 標頭",
+      "在 index.html 建立新增書籍表單、書籍列表與借出中清單區塊",
+      "在 app.js 實作呼叫 API、借出時輸入借閱人、歸還按鈕與畫面更新",
+      "在 style.css 加上基本版面與狀態標示樣式",
+      "手動測試完整流程：新增書、借出、重複借出被拒絕、歸還、清單更新"
+    ],
+    "summary": "圖書借閱小系統：可以新增書籍、將書借出給借閱人、歸還書籍，並列出目前借出中的書與借閱人。前端為靜態網頁，後端為單一 Python 模組的 JSON API，資料存放於記憶體中。"
+  },
+  "schema": 1
+}
