@@ -10,59 +10,141 @@ metadata:
 data:
   handler.py: |
     import json
+    import time
+
+    DEFAULT_WORK = 25
+    DEFAULT_BREAK = 5
+    MAX_MINUTES = 999
 
     count = 0
-    work_minutes = 25
-    break_minutes = 5
+    work_minutes = DEFAULT_WORK
+    break_minutes = DEFAULT_BREAK
+
+    timer_mode = "work"
+    timer_status = "idle"
+    timer_remaining = DEFAULT_WORK * 60
+    timer_started_at = None
+
+    ROUTES = {
+        "/count": ["GET"],
+        "/count/increment": ["POST"],
+        "/timer": ["GET"],
+        "/timer/start": ["POST"],
+        "/timer/stop": ["POST"],
+        "/timer/reset": ["POST"],
+        "/settings": ["GET", "POST"],
+    }
+
+
+    def _duration(mode):
+        return (work_minutes if mode == "work" else break_minutes) * 60
+
+
+    def _current_remaining():
+        if timer_status == "running" and timer_started_at is not None:
+            elapsed = int(time.monotonic() - timer_started_at)
+            return max(0, timer_remaining - elapsed)
+        return timer_remaining
+
+
+    def _sync():
+        """Handle expiry of a running timer: switch mode and go back to idle."""
+        global timer_mode, timer_status, timer_remaining, timer_started_at
+        if timer_status == "running" and _current_remaining() <= 0:
+            timer_mode = "break" if timer_mode == "work" else "work"
+            timer_status = "idle"
+            timer_remaining = _duration(timer_mode)
+            timer_started_at = None
+
+
+    def _timer_view():
+        _sync()
+        return {
+            "mode": timer_mode,
+            "remaining_seconds": _current_remaining(),
+            "status": timer_status,
+        }
+
+
+    def _settings_view():
+        return {"break_minutes": break_minutes, "work_minutes": work_minutes}
+
+
+    def _valid_minutes(v):
+        return isinstance(v, int) and not isinstance(v, bool) and 1 <= v <= MAX_MINUTES
+
 
     def handle(method, path, body):
         global count, work_minutes, break_minutes
-        
-        if method == "GET" and path == "/count":
+        global timer_mode, timer_status, timer_remaining, timer_started_at
+
+        if path != "/" and path.endswith("/"):
+            path = path.rstrip("/")
+
+        if path not in ROUTES:
+            return (404, {"error": "找不到此路徑"})
+        if method not in ROUTES[path]:
+            return (405, {"error": "不支援此請求方法"})
+
+        if path == "/count":
             return (200, {"count": count})
-        
-        elif method == "POST" and path == "/count/increment":
+
+        if path == "/count/increment":
             count += 1
             return (200, {"count": count})
-        
-        elif method == "GET" and path == "/timer":
-            # For this simple implementation, we don't track timer state in API
-            # Just return a default response indicating timer is not running
-            return (200, {"status": "idle", "time_left": work_minutes * 60})
-        
-        elif method == "POST" and path == "/timer/start":
-            # In a real implementation, we would start the timer here
-            # For now, we just return success
-            return (200, {"status": "started"})
-        
-        elif method == "POST" and path == "/timer/stop":
-            # In a real implementation, we would stop the timer here
-            # For now, we just return success
-            return (200, {"status": "stopped"})
-        
-        elif method == "POST" and path == "/timer/reset":
-            # In a real implementation, we would reset the timer here
-            # For now, we just return success
-            return (200, {"status": "reset"})
-        
-        elif method == "GET" and path == "/settings":
-            return (200, {
-                "work_minutes": work_minutes,
-                "break_minutes": break_minutes
-            })
-        
-        elif method == "POST" and path == "/settings":
+
+        if path == "/timer":
+            return (200, _timer_view())
+
+        if path == "/timer/start":
+            _sync()
+            if timer_status == "running":
+                return (200, _timer_view())
+            if timer_status == "idle" or timer_remaining <= 0:
+                timer_remaining = _duration(timer_mode)
+            timer_status = "running"
+            timer_started_at = time.monotonic()
+            return (200, _timer_view())
+
+        if path == "/timer/stop":
+            _sync()
+            if timer_status == "running":
+                timer_remaining = _current_remaining()
+                timer_status = "stopped"
+                timer_started_at = None
+            return (200, _timer_view())
+
+        if path == "/timer/reset":
+            timer_mode = "work"
+            timer_status = "idle"
+            timer_remaining = _duration("work")
+            timer_started_at = None
+            return (200, _timer_view())
+
+        if path == "/settings":
+            if method == "GET":
+                return (200, _settings_view())
             try:
-                data = json.loads(body.decode())
-                work_minutes = data.get("work_minutes", work_minutes)
-                break_minutes = data.get("break_minutes", break_minutes)
-                return (200, {"status": "success"})
+                data = json.loads(body.decode("utf-8")) if body else None
             except Exception:
-                return (400, {"error": "Invalid JSON"})
-        
-        else:
-            return (404, {"error": "Not Found"})
-    # skilltest
+                return (400, {"error": "請求內容不是有效的 JSON"})
+            if not isinstance(data, dict):
+                return (400, {"error": "請求內容必須是 JSON 物件"})
+            new_work = data.get("work_minutes", work_minutes)
+            new_break = data.get("break_minutes", break_minutes)
+            if not _valid_minutes(new_work):
+                return (400, {"error": "工作分鐘數必須是 1 到 %d 之間的整數" % MAX_MINUTES})
+            if not _valid_minutes(new_break):
+                return (400, {"error": "休息分鐘數必須是 1 到 %d 之間的整數" % MAX_MINUTES})
+            work_minutes = new_work
+            break_minutes = new_break
+            # Apply immediately: restart the timer in the current mode with new durations.
+            timer_status = "idle"
+            timer_started_at = None
+            timer_remaining = _duration(timer_mode)
+            return (200, _settings_view())
+
+        return (404, {"error": "找不到此路徑"})
   main.py: |
     """laoban API server (fixed template, not generated by AI).
 
