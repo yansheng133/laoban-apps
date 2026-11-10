@@ -1,0 +1,114 @@
+{
+  "appName": "t62-breakfast",
+  "files": {
+    "api": {
+      "handler.py": "import json\nfrom typing import Dict, List, Any\n\nclass Cart:\n    def __init__(self):\n        self.items = []\n\n    def add_item(self, item_id: str, name: str, price: float, quantity: int = 1):\n        for item in self.items:\n            if item['id'] == item_id:\n                item['quantity'] += quantity\n                return\n        self.items.append({'id': item_id, 'name': name, 'price': price, 'quantity': quantity})\n\n    def remove_item(self, item_id: str):\n        self.items = [item for item in self.items if item['id'] != item_id]\n\n    def get_total(self) -> float:\n        return sum(item['price'] * item['quantity'] for item in self.items)\n\n    def clear(self):\n        self.items.clear()\n\n# 模擬數據存儲\ncart = Cart()\norders: List[Dict[str, Any]] = []\nmenu_items = [\n    {'id': '1', 'name': '燕麥粥', 'price': 25.0, 'image': 'oatmeal.jpg'},\n    {'id': '2', 'name': '吐司配果醬', 'price': 30.0, 'image': 'toast.jpg'},\n    {'id': '3', 'name': '煎蛋三明治', 'price': 40.0, 'image': 'sandwich.jpg'},\n    {'id': '4', 'name': '咖啡', 'price': 20.0, 'image': 'coffee.jpg'},\n    {'id': '5', 'name': '果汁', 'price': 25.0, 'image': 'juice.jpg'}\n]\n\n# 獲取菜單\nasync def get_menu() -> List[Dict[str, Any]]:\n    return menu_items\n\n# 提交訂單\nasync def create_order(customer_name: str, customer_phone: str, items: List[Dict[str, Any]]) -> Dict[str, Any]:\n    order_id = len(orders) + 1\n    total = sum(item['price'] * item['quantity'] for item in items)\n    order = {\n        'id': order_id,\n        'customer_name': customer_name,\n        'customer_phone': customer_phone,\n        'items': items,\n        'total': total,\n        'status': 'pending'\n    }\n    orders.append(order)\n    cart.clear()\n    return order\n\n# 獲取訂單列表\nasync def get_orders() -> List[Dict[str, Any]]:\n    return orders\n\n# 獲取特定訂單詳情\nasync def get_order(order_id: int) -> Dict[str, Any]:\n    for order in orders:\n        if order['id'] == order_id:\n            return order\n    return {}\n\ndef handle(method: str, path: str, body: bytes) -> tuple[int, dict]:\n    try:\n        if method == 'GET' and path == '/menu':\n            return (200, {'items': menu_items})\n        \n        elif method == 'POST' and path == '/cart/add':\n            data = json.loads(body)\n            item_id = data.get('id')\n            name = data.get('name')\n            price = data.get('price')\n            quantity = data.get('quantity', 1)\n            \n            if not all([item_id, name, price]):\n                return (400, {'error': '缺少必要字段'})\n            \n            cart.add_item(item_id, name, price, quantity)\n            return (200, {'message': '菜品已添加到購物車'})\n        \n        elif method == 'DELETE' and path == '/cart/remove':\n            data = json.loads(body)\n            item_id = data.get('id')\n            \n            if not item_id:\n                return (400, {'error': '缺少菜品ID'})\n            \n            cart.remove_item(item_id)\n            return (200, {'message': '菜品已從購物車刪除'})\n        \n        elif method == 'GET' and path == '/cart':\n            return (200, {'items': cart.items, 'total': cart.get_total()})\n        \n        elif method == 'POST' and path == '/order':\n            data = json.loads(body)\n            customer_name = data.get('customer_name')\n            customer_phone = data.get('customer_phone')\n            items = data.get('items', [])\n            \n            if not all([customer_name, customer_phone, items]):\n                return (400, {'error': '缺少必要字段'})\n            \n            order = create_order(customer_name, customer_phone, items)\n            return (201, {'order': order})\n        \n        elif method == 'GET' and path == '/orders':\n            return (200, {'orders': orders})\n        \n        elif method == 'GET' and path.startswith('/order/'):\n            try:\n                order_id = int(path.split('/')[-1])\n                order = get_order(order_id)\n                if not order:\n                    return (404, {'error': '訂單不存在'})\n                return (200, {'order': order})\n            except ValueError:\n                return (400, {'error': '無效的訂單ID'})\n        \n        else:\n            return (404, {'error': '路徑不存在'})\n    except json.JSONDecodeError:\n        return (400, {'error': '無效的JSON數據'})\n    except Exception as e:\n        return (500, {'error': '服務器內部錯誤'})\n"
+    },
+    "web": {
+      "app.js": "document.addEventListener('DOMContentLoaded', () => {\n  const menuSection = document.getElementById('menu-section');\n  const cartSection = document.getElementById('cart-section');\n  const orderFormSection = document.getElementById('order-form-section');\n  const ordersSection = document.getElementById('orders-section');\n\n  // DOM 元素\n  const menuItemsContainer = document.getElementById('menu-items');\n  const cartItemsContainer = document.getElementById('cart-items');\n  const cartTotalElement = document.getElementById('cart-total');\n  const checkoutBtn = document.getElementById('checkout-btn');\n  const orderForm = document.getElementById('order-form');\n  const ordersListContainer = document.getElementById('orders-list');\n\n  // 狀態\n  let menuItems = [];\n  let cartItems = [];\n\n  // 獲取菜單\n  async function fetchMenu() {\n    try {\n      const response = await fetch('api/menu');\n      if (!response.ok) {\n        throw new Error(`獲取菜單失敗: ${response.status} ${response.statusText}`);\n      }\n      menuItems = await response.json();\n      renderMenu();\n    } catch (error) {\n      showError('獲取菜單失敗', error.message);\n    }\n  }\n\n  // 獲取購物車內容\n  async function fetchCart() {\n    try {\n      const response = await fetch('api/cart');\n      if (!response.ok) {\n        throw new Error(`獲取購物車失敗: ${response.status} ${response.statusText}`);\n      }\n      cartItems = await response.json();\n      renderCart();\n    } catch (error) {\n      showError('獲取購物車失敗', error.message);\n    }\n  }\n\n  // 獲取訂單列表\n  async function fetchOrders() {\n    try {\n      const response = await fetch('api/orders');\n      if (!response.ok) {\n        throw new Error(`獲取訂單列表失敗: ${response.status} ${response.statusText}`);\n      }\n      const orders = await response.json();\n      renderOrders(orders);\n    } catch (error) {\n      showError('獲取訂單列表失敗', error.message);\n    }\n  }\n\n  // 渲染菜單\n  function renderMenu() {\n    menuItemsContainer.innerHTML = '';\n    menuItems.forEach(item => {\n      const itemElement = document.createElement('div');\n      itemElement.className = 'menu-item';\n      itemElement.innerHTML = `\n        <h3>${item.name}</h3>\n        <p>價格: $${item.price}</p>\n        <button onclick=\"addToCart('${item.id}')\">加入購物車</button>\n      `;\n      menuItemsContainer.appendChild(itemElement);\n    });\n  }\n\n  // 渲染購物車\n  function renderCart() {\n    cartItemsContainer.innerHTML = '';\n    let total = 0;\n\n    cartItems.forEach(item => {\n      const itemTotal = item.price * item.quantity;\n      total += itemTotal;\n      \n      const itemElement = document.createElement('div');\n      itemElement.className = 'cart-item';\n      itemElement.innerHTML = `\n        <span>${item.name} x ${item.quantity}</span>\n        <span>$${itemTotal}</span>\n        <button onclick=\"removeFromCart('${item.id}')\">刪除</button>\n      `;\n      cartItemsContainer.appendChild(itemElement);\n    });\n\n    cartTotalElement.textContent = `總計: $${total}`;\n  }\n\n  // 加入購物車\n  async function addToCart(itemId) {\n    try {\n      const response = await fetch('api/cart/add', {\n        method: 'POST',\n        headers: {\n          'Content-Type': 'application/json',\n        },\n        body: JSON.stringify({ item_id: itemId }),\n      });\n      if (!response.ok) {\n        throw new Error(`加入購物車失敗: ${response.status} ${response.statusText}`);\n      }\n      await fetchCart(); // 重新獲取購物車\n    } catch (error) {\n      showError('加入購物車失敗', error.message);\n    }\n  }\n\n  // 從購物車刪除\n  async function removeFromCart(itemId) {\n    try {\n      const response = await fetch('api/cart/remove', {\n        method: 'DELETE',\n        headers: {\n          'Content-Type': 'application/json',\n        },\n        body: JSON.stringify({ item_id: itemId }),\n      });\n      if (!response.ok) {\n        throw new Error(`從購物車刪除失敗: ${response.status} ${response.statusText}`);\n      }\n      await fetchCart(); // 重新獲取購物車\n    } catch (error) {\n      showError('從購物車刪除失敗', error.message);\n    }\n  }\n\n  // 提交訂單\n  async function submitOrder(orderData) {\n    try {\n      const response = await fetch('api/order', {\n        method: 'POST',\n        headers: {\n          'Content-Type': 'application/json',\n        },\n        body: JSON.stringify(orderData),\n      });\n      if (!response.ok) {\n        throw new Error(`提交訂單失敗: ${response.status} ${response.statusText}`);\n      }\n      const result = await response.json();\n      alert('訂單提交成功！');\n      // 重置購物車\n      cartItems = [];\n      renderCart();\n      // 顯示訂單列表\n      showOrders();\n      fetchOrders(); // 獲取最新的訂單列表\n    } catch (error) {\n      showError('提交訂單失敗', error.message);\n    }\n  }\n\n  // 顯示訂單列表\n  function showOrders() {\n    menuSection.classList.add('hidden');\n    cartSection.classList.add('hidden');\n    orderFormSection.classList.add('hidden');\n    ordersSection.classList.remove('hidden');\n  }\n\n  // 顯示結帳頁面\n  function showCheckout() {\n    menuSection.classList.add('hidden');\n    cartSection.classList.remove('hidden');\n    orderFormSection.classList.remove('hidden');\n    ordersSection.classList.add('hidden');\n  }\n\n  // 顯示錯誤訊息\n  function showError(title, message) {\n    alert(`${title}: ${message}`);\n  }\n\n  // 初始化\n  fetchMenu();\n  fetchCart();\n\n  // 綁定事件\n  checkoutBtn.addEventListener('click', showCheckout);\n\n  orderForm.addEventListener('submit', (e) => {\n    e.preventDefault();\n    const customerName = document.getElementById('customer-name').value;\n    const customerPhone = document.getElementById('customer-phone').value;\n    const customerAddress = document.getElementById('customer-address').value;\n\n    submitOrder({\n      customer_name: customerName,\n      customer_phone: customerPhone,\n      customer_address: customerAddress,\n      items: cartItems.map(item => ({\n        item_id: item.id,\n        quantity: item.quantity\n      }))\n    });\n  });\n});",
+      "index.html": "<!DOCTYPE html>\n<html lang=\"zh-Hant\">\n<head>\n  <meta charset=\"UTF-8\">\n  <title>早餐店點餐系統</title>\n  <link rel=\"stylesheet\" href=\"style.css\">\n</head>\n<body>\n  <header>\n    <h1>早餐店點餐系統</h1>\n  </header>\n\n  <main>\n    <!-- 菜單顯示區 -->\n    <section id=\"menu-section\">\n      <h2>菜單</h2>\n      <div id=\"menu-items\" class=\"grid\"></div>\n    </section>\n\n    <!-- 購物車區 -->\n    <section id=\"cart-section\">\n      <h2>購物車</h2>\n      <div id=\"cart-items\"></div>\n      <p id=\"cart-total\">總計: $0</p>\n      <button id=\"checkout-btn\">結帳</button>\n    </section>\n\n    <!-- 訂單表單區 -->\n    <section id=\"order-form-section\" class=\"hidden\">\n      <h2>填寫訂單資訊</h2>\n      <form id=\"order-form\">\n        <label for=\"customer-name\">姓名:</label>\n        <input type=\"text\" id=\"customer-name\" required>\n        \n        <label for=\"customer-phone\">電話:</label>\n        <input type=\"tel\" id=\"customer-phone\" required>\n        \n        <label for=\"customer-address\">地址:</label>\n        <input type=\"text\" id=\"customer-address\" required>\n        \n        <button type=\"submit\">提交訂單</button>\n      </form>\n    </section>\n\n    <!-- 訂單列表區 -->\n    <section id=\"orders-section\" class=\"hidden\">\n      <h2>我的訂單</h2>\n      <div id=\"orders-list\"></div>\n    </section>\n  </main>\n\n  <script src=\"app.js\"></script>\n</body>\n</html>",
+      "style.css": "/* 全局樣式 */\nbody {\n  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;\n  margin: 0;\n  padding: 20px;\n  background-color: #f5f5f5;\n}\n\nheader {\n  text-align: center;\n  margin-bottom: 30px;\n}\n\nmain {\n  max-width: 1200px;\n  margin: 0 auto;\n}\n\nsection {\n  background-color: white;\n  padding: 20px;\n  margin-bottom: 20px;\n  border-radius: 8px;\n  box-shadow: 0 2px 4px rgba(0,0,0,0.1);\n}\n\nh1, h2 {\n  color: #333;\n}\n\nh2 {\n  border-bottom: 2px solid #007bff;\n  padding-bottom: 10px;\n}\n\n/* 菜單樣式 */\n.grid {\n  display: grid;\n  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));\n  gap: 20px;\n}\n\n.menu-item {\n  border: 1px solid #ddd;\n  padding: 15px;\n  border-radius: 5px;\n  text-align: center;\n}\n\n.menu-item h3 {\n  margin-top: 0;\n  color: #007bff;\n}\n\n.menu-item button {\n  background-color: #28a745;\n  color: white;\n  border: none;\n  padding: 10px 15px;\n  border-radius: 5px;\n  cursor: pointer;\n  margin-top: 10px;\n}\n\n.menu-item button:hover {\n  background-color: #218838;\n}\n\n/* 購物車樣式 */\ncart-items {\n  margin-bottom: 20px;\n}\n\n.cart-item {\n  display: flex;\n  justify-content: space-between;\n  align-items: center;\n  padding: 10px;\n  border-bottom: 1px solid #eee;\n}\n\ncart-item button {\n  background-color: #dc3545;\n  color: white;\n  border: none;\n  padding: 5px 10px;\n  border-radius: 5px;\n  cursor: pointer;\n}\n\ncart-item button:hover {\n  background-color: #c82333;\n}\n\n#cart-total {\n  font-weight: bold;\n  font-size: 1.2em;\n  margin-top: 10px;\n}\n\n#checkout-btn {\n  background-color: #007bff;\n  color: white;\n  border: none;\n  padding: 15px 20px;\n  border-radius: 5px;\n  cursor: pointer;\n  font-size: 1.1em;\n}\n\n#checkout-btn:hover {\n  background-color: #0056b3;\n}\n\n/* 訂單表單樣式 */\nform {\n  display: flex;\n  flex-direction: column;\n  gap: 15px;\n}\n\nform label {\n  font-weight: bold;\n}\n\nform input {\n  padding: 10px;\n  border: 1px solid #ddd;\n  border-radius: 5px;\n}\n\nform button[type=\"submit\"] {\n  background-color: #28a745;\n  color: white;\n  border: none;\n  padding: 15px;\n  border-radius: 5px;\n  cursor: pointer;\n  font-size: 1.1em;\n}\n\nform button[type=\"submit\"]:hover {\n  background-color: #218838;\n}\n\n/* 訂單列表樣式 */\n.order-item {\n  border: 1px solid #ddd;\n  padding: 15px;\n  margin-bottom: 10px;\n  border-radius: 5px;\n}\n\n.order-item h3 {\n  margin-top: 0;\n  color: #007bff;\n}\n\n.order-item p {\n  margin: 5px 0;\n}\n\n/* 隱藏樣式 */\n.hidden {\n  display: none;\n}\n\n@media (max-width: 768px) {\n  .grid {\n    grid-template-columns: 1fr;\n  }\n\n  .cart-item {\n    flex-direction: column;\n    align-items: flex-start;\n    gap: 10px;\n  }\n}\n"
+    }
+  },
+  "history": [
+    {
+      "at": "2026-11-10T09:46:55Z",
+      "by": "laoban-cli-test",
+      "kind": "create",
+      "model": "qwen3-coder:30b",
+      "request": "做一個早餐店點餐頁面：可以看菜單、選餐點加入購物車、送出訂單、查看訂單清單",
+      "summary": "一個早餐店點餐系統，包含菜單瀏覽、購物車管理、訂單提交和訂單查詢功能。"
+    }
+  ],
+  "plan": {
+    "appName": "t62-breakfast",
+    "components": {
+      "api": {
+        "endpoints": [
+          {
+            "method": "GET",
+            "path": "/menu",
+            "purpose": "獲取所有菜單項目"
+          },
+          {
+            "method": "POST",
+            "path": "/cart/add",
+            "purpose": "向購物車添加菜品"
+          },
+          {
+            "method": "DELETE",
+            "path": "/cart/remove",
+            "purpose": "從購物車刪除指定菜品"
+          },
+          {
+            "method": "GET",
+            "path": "/cart",
+            "purpose": "獲取購物車內容"
+          },
+          {
+            "method": "POST",
+            "path": "/order",
+            "purpose": "提交新訂單"
+          },
+          {
+            "method": "GET",
+            "path": "/orders",
+            "purpose": "獲取用戶所有訂單列表"
+          },
+          {
+            "method": "GET",
+            "path": "/order/{id}",
+            "purpose": "獲取特定訂單詳情"
+          }
+        ],
+        "modules": [
+          {
+            "name": "menu",
+            "purpose": "處理菜單數據的獲取和管理"
+          },
+          {
+            "name": "cart",
+            "purpose": "處理購物車操作，包括添加、刪除項目"
+          },
+          {
+            "name": "order",
+            "purpose": "處理訂單創建、查詢等業務邏輯"
+          }
+        ]
+      },
+      "web": {
+        "modules": [
+          {
+            "name": "menu-display",
+            "purpose": "顯示早餐菜單列表，包含菜品圖片、名稱、價格等資訊"
+          },
+          {
+            "name": "cart-management",
+            "purpose": "管理購物車內容，包括添加、刪除菜品項目"
+          },
+          {
+            "name": "order-form",
+            "purpose": "提供訂單填寫表單，收集顧客資訊"
+          },
+          {
+            "name": "order-list",
+            "purpose": "顯示用戶歷史訂單列表"
+          }
+        ]
+      }
+    },
+    "notes": "此應用使用內存存儲數據，不包含持久化功能。前端與後端通過標準 HTTP API 進行通信。",
+    "steps": [
+      "創建前端靜態文件 (index.html, app.js, style.css) 用於顯示菜單和購物車界面",
+      "實現 API handler.py 文件處理所有後端邏輯",
+      "定義菜單數據結構並在 API 中實現獲取菜單功能",
+      "實現購物車功能，包括添加、刪除項目",
+      "建立訂單系統，支持創建和查詢訂單",
+      "連接前端與後端 API，實現數據交互",
+      "測試所有功能是否正常運作",
+      "部署應用到 Rancher Kubernetes 集群"
+    ],
+    "summary": "一個早餐店點餐系統，包含菜單瀏覽、購物車管理、訂單提交和訂單查詢功能。"
+  },
+  "schema": 1
+}
