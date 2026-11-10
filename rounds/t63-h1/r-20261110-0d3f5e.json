@@ -1,0 +1,48 @@
+{
+  "app": "t63-h1",
+  "archivedAt": "2026-11-10T15:04:23Z",
+  "openedAt": "2026-11-10T15:04:21Z",
+  "round": {
+    "app": "t63-h1",
+    "confirmers": [],
+    "deadline": 1794324861,
+    "id": "r-20261110-0d3f5e",
+    "initiator": "laoban-cli-test",
+    "log": [
+      {
+        "args": {
+          "minutes": "30"
+        },
+        "at": "2026-11-10T15:04:21Z",
+        "by": "laoban-cli-test",
+        "code": "opened",
+        "event": "started a round (converges in 30 min)"
+      },
+      {
+        "at": "2026-11-10T15:04:21Z",
+        "by": "laoban-cli-test",
+        "code": "cancelled",
+        "event": "cancelled this round"
+      }
+    ],
+    "message": "",
+    "opinions": [
+      {
+        "at": "2026-11-10T15:04:21Z",
+        "by": "laoban-cli-test",
+        "id": "o1",
+        "replies": [],
+        "supporters": [],
+        "text": "按鈕顏色改成綠色"
+      }
+    ],
+    "plan": null,
+    "result": null,
+    "scope": [
+      "web"
+    ],
+    "state": "cancelled"
+  },
+  "schema": 1,
+  "targetNamespace": "laoban-dev"
+}
