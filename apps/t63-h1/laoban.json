@@ -1,0 +1,105 @@
+{
+  "appName": "t63-h1",
+  "files": {
+    "api": {
+      "handler.py": "from __future__ import annotations\n\nimport threading\n\n_ID = \"main\"\n_value = 0\n_lock = threading.Lock()\n\n\ndef _state():\n    return {\"id\": _ID, \"value\": _value}\n\n\ndef _get():\n    with _lock:\n        return 200, _state()\n\n\ndef _increment():\n    global _value\n    with _lock:\n        _value += 1\n        return 200, _state()\n\n\ndef _decrement():\n    global _value\n    with _lock:\n        _value -= 1\n        return 200, _state()\n\n\ndef _reset():\n    global _value\n    with _lock:\n        _value = 0\n        return 200, _state()\n\n\n_ROUTES = {\n    \"/counter\": {\"GET\": _get},\n    \"/counter/increment\": {\"POST\": _increment},\n    \"/counter/decrement\": {\"POST\": _decrement},\n    \"/counter/reset\": {\"POST\": _reset},\n}\n\n\ndef handle(method: str, path: str, body: bytes) -> tuple[int, dict]:\n    try:\n        p = path or \"/\"\n        if len(p) > 1:\n            p = p.rstrip(\"/\") or \"/\"\n        route = _ROUTES.get(p)\n        if route is None:\n            return 404, {\"error\": \"找不到此路徑\"}\n        fn = route.get(str(method).upper())\n        if fn is None:\n            return 405, {\"error\": \"不支援此請求方法\"}\n        return fn()\n    except Exception:\n        return 500, {\"error\": \"伺服器內部錯誤\"}\n"
+    },
+    "web": {
+      "app.js": "(function () {\n  var countEl = document.getElementById('count');\n  var errorEl = document.getElementById('error');\n  var buttons = [\n    document.getElementById('btn-dec'),\n    document.getElementById('btn-reset'),\n    document.getElementById('btn-inc')\n  ];\n\n  function showError(msg) {\n    errorEl.textContent = msg;\n    errorEl.hidden = false;\n  }\n\n  function clearError() {\n    errorEl.textContent = '';\n    errorEl.hidden = true;\n  }\n\n  function setBusy(busy) {\n    buttons.forEach(function (b) { b.disabled = busy; });\n  }\n\n  async function call(doFetch) {\n    var res;\n    try {\n      res = await doFetch();\n    } catch (e) {\n      throw new Error('無法連線到伺服器，請稍後再試。');\n    }\n    var text = '';\n    try { text = await res.text(); } catch (e) { text = ''; }\n    var data = null;\n    try { data = JSON.parse(text); } catch (e) { data = null; }\n    if (!res.ok) {\n      if (data && typeof data.error === 'string' && data.error) {\n        throw new Error(data.error);\n      }\n      throw new Error('請求失敗（HTTP ' + res.status + '）');\n    }\n    if (!data || typeof data.value !== 'number') {\n      throw new Error('伺服器回應的格式不正確。');\n    }\n    return data;\n  }\n\n  async function run(doFetch) {\n    setBusy(true);\n    try {\n      var data = await call(doFetch);\n      countEl.textContent = String(data.value);\n      clearError();\n    } catch (e) {\n      showError(e.message);\n    } finally {\n      setBusy(false);\n    }\n  }\n\n  document.getElementById('btn-inc').addEventListener('click', function () {\n    run(function () {\n      return fetch('api/counter/increment', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });\n    });\n  });\n  document.getElementById('btn-dec').addEventListener('click', function () {\n    run(function () {\n      return fetch('api/counter/decrement', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });\n    });\n  });\n  document.getElementById('btn-reset').addEventListener('click', function () {\n    run(function () {\n      return fetch('api/counter/reset', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });\n    });\n  });\n\n  run(function () {\n    return fetch('api/counter', { method: 'GET' });\n  });\n})();\n",
+      "index.html": "<!DOCTYPE html>\n<html lang='zh-Hant-TW'>\n<head>\n<meta charset='utf-8'>\n<meta name='viewport' content='width=device-width, initial-scale=1'>\n<title>計數器</title>\n<link rel='stylesheet' href='style.css'>\n</head>\n<body>\n<main>\n<h1>計數器</h1>\n<div id='count' class='count' aria-live='polite'>載入中…</div>\n<div class='buttons'>\n<button type='button' id='btn-dec'>減一</button>\n<button type='button' id='btn-reset'>歸零</button>\n<button type='button' id='btn-inc'>加一</button>\n</div>\n<p id='error' class='error' role='alert' aria-live='assertive' hidden></p>\n</main>\n<script src='app.js' defer></script>\n</body>\n</html>\n",
+      "style.css": "* { box-sizing: border-box; }\nbody {\n  margin: 0;\n  min-height: 100vh;\n  display: flex;\n  align-items: center;\n  justify-content: center;\n  font-family: system-ui, 'PingFang TC', 'Microsoft JhengHei', sans-serif;\n  background: #f3f4f6;\n  color: #111827;\n}\nmain {\n  text-align: center;\n  padding: 24px;\n  width: 100%;\n  max-width: 480px;\n}\nh1 { font-size: 1.5rem; margin: 0 0 16px; }\n.count {\n  font-size: 6rem;\n  font-weight: 700;\n  line-height: 1.2;\n  margin: 16px 0 24px;\n  word-break: break-all;\n}\n.buttons {\n  display: flex;\n  gap: 12px;\n  justify-content: center;\n  flex-wrap: wrap;\n}\nbutton {\n  font: inherit;\n  font-size: 1.1rem;\n  padding: 10px 24px;\n  border: none;\n  border-radius: 8px;\n  background: #2563eb;\n  color: #fff;\n  cursor: pointer;\n}\nbutton:hover { background: #1d4ed8; }\nbutton:disabled {\n  background: #9ca3af;\n  cursor: not-allowed;\n}\n#btn-reset { background: #6b7280; }\n#btn-reset:hover { background: #4b5563; }\n#btn-reset:disabled { background: #9ca3af; }\n.error {\n  margin: 20px 0 0;\n  padding: 10px 14px;\n  border-radius: 8px;\n  background: #fee2e2;\n  color: #991b1b;\n}\n.error[hidden] { display: none; }\n"
+    }
+  },
+  "history": [
+    {
+      "at": "2026-11-10T14:54:56Z",
+      "by": "laoban-cli-test",
+      "kind": "create",
+      "model": "claude-sonnet-5-5",
+      "request": "做一個簡單的計數器：按鈕加一、減一、歸零，數字存在後端",
+      "summary": "一個簡單的計數器網頁：畫面上有「加一」、「減一」、「歸零」三個按鈕，計數數字儲存在後端 API 的記憶體中，每次操作後由後端回傳最新數字並顯示。"
+    }
+  ],
+  "plan": {
+    "appName": "t63-h1",
+    "components": {
+      "api": {
+        "endpoints": [
+          {
+            "method": "GET",
+            "path": "/counter",
+            "purpose": "取得目前的計數。",
+            "response": "{\"id\":\"main\",\"value\":0}"
+          },
+          {
+            "method": "POST",
+            "path": "/counter/increment",
+            "purpose": "將計數加一並回傳最新值。",
+            "response": "{\"id\":\"main\",\"value\":1}"
+          },
+          {
+            "method": "POST",
+            "path": "/counter/decrement",
+            "purpose": "將計數減一並回傳最新值。",
+            "response": "{\"id\":\"main\",\"value\":-1}"
+          },
+          {
+            "method": "POST",
+            "path": "/counter/reset",
+            "purpose": "將計數歸零並回傳。",
+            "response": "{\"id\":\"main\",\"value\":0}"
+          }
+        ],
+        "modules": [
+          {
+            "name": "計數狀態",
+            "purpose": "在記憶體中保存計數整數，提供讀取、加一、減一、歸零操作，並以鎖確保執行緒安全。"
+          },
+          {
+            "name": "路由",
+            "purpose": "依方法與路徑分派到對應處理函式，未知路徑回傳 404，不支援的方法回傳 405。"
+          },
+          {
+            "name": "回應",
+            "purpose": "將結果序列化為 JSON 物件並設定 Content-Type 與狀態碼。"
+          }
+        ]
+      },
+      "web": {
+        "modules": [
+          {
+            "name": "計數顯示",
+            "purpose": "在頁面中央以大字顯示目前的計數數字。"
+          },
+          {
+            "name": "操作按鈕",
+            "purpose": "提供「加一」、「減一」、「歸零」三個按鈕，按下後觸發對應的 API 呼叫。"
+          },
+          {
+            "name": "API 呼叫",
+            "purpose": "載入時取得初始數字，按鈕按下時送出 POST 請求，並用回應的 value 重新繪製畫面，前端本身不自行計數。"
+          },
+          {
+            "name": "錯誤提示",
+            "purpose": "當 API 請求失敗時，在頁面上顯示簡短的錯誤訊息。"
+          }
+        ]
+      }
+    },
+    "notes": "計數只存放在後端記憶體中，伺服器重啟或重新部署後會回到 0。請只使用單一副本，否則多個副本會各自持有不同的數字。減一允許出現負數，沒有設定下限。所有端點都回傳相同格式的 JSON 物件，前端只需要一種顯示邏輯。",
+    "steps": [
+      "定義後端計數狀態：以一個整數在記憶體中保存目前數字，初始值為 0，並用鎖避免同時修改。",
+      "實作 GET /counter，回傳目前的計數。",
+      "實作 POST /counter/increment，將數字加一後回傳最新值。",
+      "實作 POST /counter/decrement，將數字減一後回傳最新值。",
+      "實作 POST /counter/reset，將數字歸零後回傳。",
+      "實作路由與 JSON 回應，對未知路徑回傳 404、對不支援的方法回傳 405，格式皆為 JSON。",
+      "建立前端頁面，包含數字顯示區與「加一」、「減一」、「歸零」三個按鈕。",
+      "前端載入時呼叫 GET /counter 取得初始數字，每次按下按鈕就呼叫對應的 POST 端點，並以回應中的 value 更新畫面。",
+      "加入簡單的錯誤提示，當 API 呼叫失敗時顯示訊息。",
+      "測試四個端點與三個按鈕的行為後部署。"
+    ],
+    "summary": "一個簡單的計數器網頁：畫面上有「加一」、「減一」、「歸零」三個按鈕，計數數字儲存在後端 API 的記憶體中，每次操作後由後端回傳最新數字並顯示。"
+  },
+  "schema": 1
+}
