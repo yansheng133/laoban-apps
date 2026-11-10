@@ -56,6 +56,17 @@ data:
         return v.toLocaleString('zh-TW');
       }
 
+      // 明細列表用的千分位格式（固定以逗號分隔，只影響顯示）
+      function fmtThousands(n) {
+        var v = Number(n);
+        if (!isFinite(v)) { return String(n); }
+        var neg = v < 0;
+        var s = String(Math.abs(Math.trunc(v)));
+        if (/e/i.test(s)) { return fmt(v); }
+        s = s.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+        return (neg ? '-' : '') + s;
+      }
+
       // 統一的 API 呼叫；失敗時丟出帶有訊息的 Error
       function api(method, path, body) {
         var opts = { method: method, headers: {} };
@@ -166,7 +177,7 @@ data:
 
           var tdAmt = document.createElement('td');
           tdAmt.className = 'num';
-          tdAmt.textContent = fmt(e.amount);
+          tdAmt.textContent = fmtThousands(e.amount);
           tr.appendChild(tdAmt);
 
           var tdNote = document.createElement('td');
@@ -287,7 +298,7 @@ data:
       }
 
       function removeEntry(e) {
-        var label = e.date + ' ' + e.category + ' ' + fmt(e.amount);
+        var label = e.date + ' ' + e.category + ' ' + fmtThousands(e.amount);
         if (!window.confirm('確定要刪除這筆明細嗎？\n' + label)) { return; }
         clearError();
         api('DELETE', 'api/entries/' + encodeURIComponent(e.id)).then(function () {
@@ -345,12 +356,12 @@ data:
     <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>記帳本</title>
+    <title>我的記帳本</title>
     <link rel="stylesheet" href="style.css">
     </head>
     <body>
     <header>
-    <h1>記帳本</h1>
+    <h1>我的記帳本</h1>
     <div class="month-switch">
     <label for="month">月份</label>
     <input type="month" id="month" required>
@@ -567,7 +578,7 @@ data:
     body {
       margin: 0;
       font-family: system-ui, -apple-system, "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", sans-serif;
-      background: #f3f5f8;
+      background: #e3f4e1;
       color: #1f2933;
       line-height: 1.5;
     }

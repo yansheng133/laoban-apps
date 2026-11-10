@@ -21,7 +21,7 @@ spec:
         app.kubernetes.io/name: "t62-demo-web"
         app.kubernetes.io/component: "web"
       annotations:
-        laoban.io/content-hash: "432dfa65c1e10d982588649ef028df362dc5a0aff64cd4a1c1b01144f561d5e1"
+        laoban.io/content-hash: "4750f0ad5e101e39802e9c83f7ec554adf3e2537717e80424b2ead70ce59fdb4"
     spec:
       automountServiceAccountToken: false
       securityContext:
