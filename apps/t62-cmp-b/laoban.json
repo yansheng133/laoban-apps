@@ -1,0 +1,94 @@
+{
+  "appName": "t62-cmp-b",
+  "files": {
+    "api": {
+      "handler.py": "import json\n\ntodos = [\n    {\"id\": \"1\", \"title\": \"完成報告\", \"completed\": False},\n    {\"id\": \"2\", \"title\": \"準備會議資料\", \"completed\": True}\n]\n\ntodo_id_counter = 3\n\ndef handle(method, path, body):\n    global todos, todo_id_counter\n    \n    if method == \"GET\" and path == \"/todos\":\n        return (200, {\"items\": todos})\n    \n    elif method == \"POST\" and path == \"/todos\":\n        data = json.loads(body)\n        new_todo = {\n            \"id\": str(todo_id_counter),\n            \"title\": data[\"title\"],\n            \"completed\": False\n        }\n        todos.append(new_todo)\n        todo_id_counter += 1\n        return (200, new_todo)\n    \n    elif method == \"PUT\" and path.startswith(\"/todos/\"):\n        todo_id = path.split(\"/\")[3]\n        data = json.loads(body)\n        for todo in todos:\n            if todo[\"id\"] == todo_id:\n                todo[\"completed\"] = data[\"completed\"]\n                return (200, todo)\n        return (404, {\"error\": \"待辦事項未找到\"})\n    \n    elif method == \"DELETE\" and path.startswith(\"/todos/\"):\n        todo_id = path.split(\"/\")[3]\n        for i, todo in enumerate(todos):\n            if todo[\"id\"] == todo_id:\n                todos.pop(i)\n                return (200, {\"message\": \"待辦事項已刪除\"})\n        return (404, {\"error\": \"待辦事項未找到\"})\n    \n    elif method == \"GET\" and path == \"/todos/count\":\n        count = len([todo for todo in todos if not todo[\"completed\"]])\n        return (200, {\"count\": count})\n    \n    return (404, {\"error\": \"未找到路由\"})"
+    },
+    "web": {
+      "app.js": "document.addEventListener('DOMContentLoaded', () => {\n    const todoInput = document.getElementById('todoInput');\n    const addBtn = document.getElementById('addBtn');\n    const todoList = document.getElementById('todoList');\n    const countDisplay = document.getElementById('countDisplay');\n\n    // 從API取得待辦事項列表並更新UI\n    async function loadTodos() {\n        try {\n            const response = await fetch('api/todos');\n            const todos = await response.json();\n            updateTodoList(todos);\n            updateCountDisplay(todos);\n        } catch (error) {\n            console.error('載入待辦事項失敗:', error);\n        }\n    }\n\n    // 更新待辦列表顯示\n    function updateTodoList(todos) {\n        todoList.innerHTML = '';\n        todos.items.forEach(todo => {\n            const li = document.createElement('li');\n            li.className = 'todo-item';\n            li.dataset.id = todo.id;\n            \n            li.innerHTML = `\n                <span class=\"todo-text ${todo.completed ? 'completed' : ''}\">\n                    ${todo.title}\n                </span>\n                <div class=\"todo-actions\">\n                    <button class=\"toggle-btn\" data-action=\"toggle\" data-id=\"${todo.id}\">\n                        ${todo.completed ? '取消完成' : '標記完成'}\n                    </button>\n                    <button class=\"delete-btn\" data-action=\"delete\" data-id=\"${todo.id}\">刪除</button>\n                </div>\n            `;\n            \n            todoList.appendChild(li);\n        });\n    }\n\n    // 更新未完成數量顯示\n    function updateCountDisplay(todos) {\n        const count = todos.items.filter(todo => !todo.completed).length;\n        countDisplay.textContent = `尚未完成的待辦事項：${count}`;\n    }\n\n    // 新增待辦事項\n    async function addTodo() {\n        const title = todoInput.value.trim();\n        if (!title) return;\n        \n        try {\n            const response = await fetch('api/todos', {\n                method: 'POST',\n                headers: { 'Content-Type': 'application/json' },\n                body: JSON.stringify({ title })\n            });\n            \n            if (response.ok) {\n                todoInput.value = '';\n                await loadTodos();\n            } else {\n                console.error('新增待辦事項失敗');\n            }\n        } catch (error) {\n            console.error('新增待辦事項時發生錯誤:', error);\n        }\n    }\n\n    // 切換待辦事項完成狀態\n    async function toggleTodo(id) {\n        try {\n            const response = await fetch(`api/todos/${id}`, {\n                method: 'PUT',\n                headers: { 'Content-Type': 'application/json' },\n                body: JSON.stringify({ completed: true })\n            });\n            \n            if (response.ok) {\n                await loadTodos();\n            } else {\n                console.error('更新待辦事項狀態失敗');\n            }\n        } catch (error) {\n            console.error('更新待辦事項狀態時發生錯誤:', error);\n        }\n    }\n\n    // 刪除待辦事項\n    async function deleteTodo(id) {\n        try {\n            const response = await fetch(`api/todos/${id}`, {\n                method: 'DELETE'\n            });\n            \n            if (response.ok) {\n                await loadTodos();\n            } else {\n                console.error('刪除待辦事項失敗');\n            }\n        } catch (error) {\n            console.error('刪除待辦事項時發生錯誤:', error);\n        }\n    }\n\n    // 綁定事件處理器\n    addBtn.addEventListener('click', addTodo);\n    \n    todoInput.addEventListener('keypress', (e) => {\n        if (e.key === 'Enter') addTodo();\n    });\n    \n    todoList.addEventListener('click', (e) => {\n        const action = e.target.dataset.action;\n        const id = e.target.dataset.id;\n        \n        if (action === 'toggle') {\n            toggleTodo(id);\n        } else if (action === 'delete') {\n            deleteTodo(id);\n        }\n    });\n\n    // 初始化載入待辦事項\n    loadTodos();\n});",
+      "index.html": "<!DOCTYPE html>\n<html lang=\"zh-TW\">\n<head>\n  <meta charset=\"UTF-8\">\n  <title>待辦事項清單</title>\n  <link rel=\"stylesheet\" href=\"style.css\">\n</head>\n<body>\n  <div class=\"container\">\n    <h1>待辦事項清單</h1>\n    \n    <div class=\"input-section\">\n      <input type=\"text\" id=\"todoInput\" placeholder=\"輸入新的待辦事項\">\n      <button id=\"addBtn\">新增</button>\n    </div>\n    \n    <div class=\"count-section\">\n      <span id=\"countDisplay\">尚未完成的待辦事項：0</span>\n    </div>\n    \n    <ul id=\"todoList\" class=\"todo-list\"></ul>\n  </div>\n  \n  <script src=\"app.js\"></script>\n</body>\n</html>",
+      "style.css": "body {\n  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;\n  margin: 0;\n  padding: 20px;\n  background-color: #f5f5f5;\n}\n\n.container {\n  max-width: 600px;\n  margin: 0 auto;\n  background-color: white;\n  border-radius: 8px;\n  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);\n  padding: 20px;\n}\n\nh1 {\n  text-align: center;\n  color: #333;\n  margin-bottom: 20px;\n}\n\n.input-section {\n  display: flex;\n  gap: 10px;\n  margin-bottom: 20px;\n}\n\n#todoInput {\n  flex: 1;\n  padding: 10px;\n  border: 1px solid #ddd;\n  border-radius: 4px;\n  font-size: 16px;\n}\n\n#addBtn {\n  padding: 10px 20px;\n  background-color: #007bff;\n  color: white;\n  border: none;\n  border-radius: 4px;\n  cursor: pointer;\n  font-size: 16px;\n}\n\n#addBtn:hover {\n  background-color: #0056b3;\n}\n\ncount-section {\n  margin-bottom: 20px;\n}\n\n#countDisplay {\n  font-weight: bold;\n  color: #666;\n}\n\n.todo-list {\n  list-style: none;\n  padding: 0;\n}\n\n.todo-item {\n  display: flex;\n  justify-content: space-between;\n  align-items: center;\n  padding: 15px;\n  border-bottom: 1px solid #eee;\n}\n\n.todo-item:last-child {\n  border-bottom: none;\n}\n\n.todo-text {\n  flex: 1;\n  margin-right: 10px;\n  font-size: 16px;\n}\n\n.todo-text.completed {\n  text-decoration: line-through;\n  color: #999;\n}\n\n.todo-actions {\n  display: flex;\n  gap: 5px;\n}\n\n.toggle-btn, .delete-btn {\n  padding: 5px 10px;\n  border: none;\n  border-radius: 4px;\n  cursor: pointer;\n  font-size: 14px;\n}\n\n.toggle-btn {\n  background-color: #28a745;\n  color: white;\n}\n\n.toggle-btn:hover {\n  background-color: #218838;\n}\n\n.delete-btn {\n  background-color: #dc3545;\n  color: white;\n}\n\n.delete-btn:hover {\n  background-color: #c82333;\n}"
+    }
+  },
+  "history": [
+    {
+      "at": "2026-11-10T10:19:06Z",
+      "by": "laoban-cli-test",
+      "kind": "create",
+      "model": "qwen3-coder:30b",
+      "request": "做一個待辦事項清單：可以新增、標記完成、刪除待辦，並顯示還沒完成的數量",
+      "summary": "一個簡單的待辦事項清單應用程式，使用者可以新增待辦項目、標記為完成、刪除待辦，並即時顯示尚未完成的待辦數量。"
+    }
+  ],
+  "plan": {
+    "appName": "t62-cmp-b",
+    "components": {
+      "api": {
+        "endpoints": [
+          {
+            "method": "GET",
+            "path": "/todos",
+            "purpose": "取得所有待辦事項",
+            "response": "{\"items\": [{\"id\": \"1\", \"title\": \"完成報告\", \"completed\": false}]}"
+          },
+          {
+            "method": "POST",
+            "path": "/todos",
+            "purpose": "新增待辦事項",
+            "request": "{\"title\": \"新的待辦事項\"}",
+            "response": "{\"id\": \"2\", \"title\": \"新的待辦事項\", \"completed\": false}"
+          },
+          {
+            "method": "PUT",
+            "path": "/todos/{todo_id}",
+            "purpose": "更新待辦事項狀態（標記完成/未完成）",
+            "request": "{\"completed\": true}",
+            "response": "{\"id\": \"1\", \"title\": \"完成報告\", \"completed\": true}"
+          },
+          {
+            "method": "DELETE",
+            "path": "/todos/{todo_id}",
+            "purpose": "刪除待辦事項",
+            "response": "{\"message\": \"待辦事項已刪除\"}"
+          },
+          {
+            "method": "GET",
+            "path": "/todos/count",
+            "purpose": "取得尚未完成的待辦事項數量",
+            "response": "{\"count\": 2}"
+          }
+        ],
+        "modules": [
+          {
+            "name": "todos",
+            "purpose": "管理待辦事項的儲存和操作"
+          }
+        ]
+      },
+      "web": {
+        "modules": [
+          {
+            "name": "todo-ui",
+            "purpose": "管理待辦事項的使用者介面元件，包括輸入框、按鈕和列表展示"
+          },
+          {
+            "name": "todo-controller",
+            "purpose": "處理前端邏輯，與API互動並更新UI"
+          }
+        ]
+      }
+    },
+    "notes": "此應用程式使用記憶體儲存所有待辦事項，不包含持久化儲存。前端會自動更新未完成數量顯示，所有操作都透過API進行，確保資料一致性。",
+    "steps": [
+      "建立前端靜態頁面，包含待辦輸入框、新增按鈕、待辦列表展示區和未完成數量顯示區",
+      "實作前端JavaScript，處理待辦項目的新增、標記完成、刪除功能",
+      "設計API模組處理待辦事項的CRUD操作",
+      "實作後端Python API，使用記憶體儲存待辦資料",
+      "設定API端點以支援待辦事項的新增、取得、更新和刪除",
+      "整合前端與後端API，使前端能正確呼叫後端功能",
+      "測試所有功能，確保新增、標記完成、刪除及未完成數量計算正確"
+    ],
+    "summary": "一個簡單的待辦事項清單應用程式，使用者可以新增待辦項目、標記為完成、刪除待辦，並即時顯示尚未完成的待辦數量。"
+  },
+  "schema": 1
+}
