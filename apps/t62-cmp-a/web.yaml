@@ -21,7 +21,7 @@ spec:
         app.kubernetes.io/name: "t62-cmp-a-web"
         app.kubernetes.io/component: "web"
       annotations:
-        laoban.io/content-hash: "3bf19cda883cb5fc2bf7c6f10496c72537e673c92b745123a5f4d73bf53ad694"
+        laoban.io/content-hash: "21475cbeae78da58d5f1db59b87bb36c8b387fc08e882ed4957432e162e893ad"
     spec:
       automountServiceAccountToken: false
       securityContext:
