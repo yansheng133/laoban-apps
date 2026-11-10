@@ -21,7 +21,7 @@ spec:
         app.kubernetes.io/name: "night-memo-api"
         app.kubernetes.io/component: "api"
       annotations:
-        laoban.io/content-hash: "f767f92d17cb1b9e77d5335b7005750350f6a2c3a005211e35ded106b8fcfb33"
+        laoban.io/content-hash: "6e3eb1e2ecdca7a3287e8265aed691a9545c046a0101322c97bc5d93542eff4a"
     spec:
       automountServiceAccountToken: false
       securityContext:
